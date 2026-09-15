@@ -77,3 +77,46 @@ def _default_org() -> str | None:
             return row["id"] if row else None
     except Exception:
         return None
+
+
+# ── 获客门户数据代理（匿名可用，转发 Gobob SMB，带缓存/降级）─────
+
+@router.get("/schools/lookup")
+def schools_lookup(q: str = "", limit: int = 20):
+    """院校名联想（表单 SchoolPicker 用）。"""
+    if not gobob_client.is_enabled():
+        return {"items": []}
+    items = gobob_client.schools_lookup(q, limit) or []
+    return {"items": items}
+
+
+@router.get("/schools/{school_id}")
+def school_detail(school_id: str):
+    _require_gobob()
+    data = gobob_client.get_school(school_id)
+    if data is None:
+        raise HTTPException(status_code=502, detail="院校数据暂时不可用")
+    return data
+
+
+@router.get("/majors")
+def majors(limit: int = 200):
+    if not gobob_client.is_enabled():
+        return {"items": []}
+    data = gobob_client.get_majors(limit)
+    return data or {"items": []}
+
+
+class AiAskReq(BaseModel):
+    question: str
+    student_profile: dict | None = None
+
+
+@router.post("/ai-ask")
+def ai_ask(req: AiAskReq):
+    """评估页 AI 问答（转发 Gobob LLM）。无 Key 时 503。"""
+    _require_gobob()
+    result = gobob_client.llm_ask(req.model_dump())
+    if result is None:
+        raise HTTPException(status_code=502, detail="AI 服务暂时不可用")
+    return result

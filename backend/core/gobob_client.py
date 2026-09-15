@@ -122,11 +122,16 @@ def get_assessment_meta() -> dict | None:
     return _get("/api/smb/v1/meta", cache_key="assessment_meta")
 
 
-def search_schools(q: str = "", country: str = "", page: int = 1, page_size: int = 20) -> dict | None:
-    ck = f"schools:{q}:{country}:{page}:{page_size}"
-    return _get("/api/smb/v1/schools",
-                params={"q": q, "country": country, "page": page, "page_size": page_size},
-                cache_key=ck, cache_ttl=3600)
+def schools_lookup(q: str = "", limit: int = 20) -> list | None:
+    """院校名联想（SchoolPicker 用）。返回轻量列表。"""
+    data = _get("/api/smb/v1/schools", params={"q": q, "page_size": limit},
+                cache_key=f"slookup:{q}:{limit}", cache_ttl=3600)
+    return data.get("items") if data else None
+
+
+def get_majors(limit: int = 200) -> list | None:
+    """专业列表（MajorPicker）。SMB 暂无 /majors，从 programs 去重，或远程补。"""
+    return _get("/api/smb/v1/majors", params={"limit": limit}, cache_key=f"majors:{limit}")
 
 
 def get_school(school_id: str) -> dict | None:
@@ -140,3 +145,8 @@ def match(student_input: dict) -> dict | None:
 
 def match_single(payload: dict) -> dict | None:
     return _post("/api/smb/v1/match-single", payload)
+
+
+def llm_ask(payload: dict) -> dict | None:
+    """评估页 AI 问答。SMB 侧若无此端点则返回 None（前端降级隐藏）。"""
+    return _post("/api/smb/v1/llm-ask", payload)

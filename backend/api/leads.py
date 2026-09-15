@@ -424,22 +424,66 @@ def assign_lead(lead_id: str, req: AssignReq, user: dict = Depends(auth.require_
 
 # ── 公海认领 ─────────────────────────────────────────────────────
 
+class ClaimReq(BaseModel):
+    advisor_id: str | None = None  # owner 认领时指定目标顾问；advisor 认领忽略
+
+
 @router.post("/{lead_id}/claim")
-def claim_lead(lead_id: str, user: dict = Depends(auth.require_staff),
-               org_id: str = Depends(get_org_id)):
-    """从公海认领线索。advisor 认领自己，owner 可代别人认领。"""
+def claim_lead(lead_id: str, req: ClaimReq = None,
+               user: dict = Depends(auth.require_staff), org_id: str = Depends(get_org_id)):
+    """从公海认领线索。advisor 认领自己；owner 需在 body 指定 advisor_id。"""
+    body = req or ClaimReq()
     with db_cursor() as cur:
         cur.execute("SELECT * FROM leads WHERE lead_id=%s AND org_id=%s", (lead_id, org_id))
         lead = cur.fetchone()
         if not lead: raise HTTPException(404, "线索不存在")
         if lead["is_recycled"] != 1 and lead.get("assigned_advisor_id"):
             raise HTTPException(400, "该线索已有归属，可走'转移'而非'认领'")
-        target = user.get("member_id") if user["role"] == auth.ROLE_ADVISOR else None
-        if not target:
-            raise HTTPException(400, "owner 认领需指定目标顾问")
+        if user["role"] == auth.ROLE_ADVISOR:
+            target = user.get("member_id")
+        elif user["role"] == auth.ROLE_OWNER:
+            if not body.advisor_id:
+                raise HTTPException(400, "owner 认领需指定 advisor_id")
+            cur.execute("SELECT id FROM members WHERE id=%s AND org_id=%s AND role='advisor'", (body.advisor_id, org_id))
+            if not cur.fetchone(): raise HTTPException(400, "目标顾问不存在")
+            target = body.advisor_id
+        else:
+            raise HTTPException(403, "无权限")
         cur.execute(
             "UPDATE leads SET assigned_advisor_id=%s, is_recycled=0, status='new', last_contact_at=NULL WHERE lead_id=%s",
             (target, lead_id))
+    return {"ok": True, "advisor_id": target}
+
+
+# ── 操作回滚（撞单合并后 7 天内恢复） ─────────────────────────
+
+@router.post("/{lead_id}/restore")
+def restore_lead(lead_id: str, user: dict = Depends(auth.require_owner),
+                 org_id: str = Depends(get_org_id)):
+    """恢复被合并的线索（is_recycled=1, recycled_reason 含 'merged to'）→ 7 天内可回滚。"""
+    with db_transaction() as cur:
+        cur.execute(
+            "SELECT * FROM leads WHERE lead_id=%s AND org_id=%s AND is_recycled=1",
+            (lead_id, org_id))
+        lead = cur.fetchone()
+        if not lead:
+            raise HTTPException(404, "线索不存在或未回收")
+        if not (lead.get("recycled_reason") and "merged to" in lead["recycled_reason"]):
+            raise HTTPException(400, "该线索不是合并归档（不支持回滚）")
+        # 7 天时限
+        if lead.get("recycled_at"):
+            days = (datetime.utcnow() - lead["recycled_at"]).days
+            if days > 7:
+                raise HTTPException(400, f"已回收 {days} 天，超过 7 天回滚期")
+        # 恢复
+        cur.execute(
+            "UPDATE leads SET is_recycled=0, status='new', recycled_at=NULL, recycled_reason=NULL WHERE lead_id=%s",
+            (lead_id,))
+        cur.execute(
+            """INSERT INTO audit_log (id, org_id, actor_member_id, action, target_type, target_id, detail)
+               VALUES (%s,%s,%s,'lead_restore','lead',%s,%s)""",
+            (new_id(), org_id, user.get("member_id"), lead_id,
+             json.dumps({"restored_by": user.get("member_id")})))
     return {"ok": True}
 
 

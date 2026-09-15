@@ -205,7 +205,7 @@ def update_task(tid: str, req: DoneReq, user: dict = Depends(auth.get_current_us
     with db_cursor() as cur:
         cur.execute("SELECT * FROM tasks WHERE id=%s AND org_id=%s", (tid, org_id))
         t = cur.fetchone()
-        if not cur.fetchone(): raise HTTPException(404, "任务不存在")
+        if not t: raise HTTPException(404, "任务不存在")
         warnings = []
         if req.status == "done":
             # hard 依赖：未完成 → 422
@@ -290,7 +290,7 @@ def timeline(student_id: str, user: dict = Depends(auth.get_current_user),
     """返回学生所有任务的 phase 分组 + 关键路径 + 下个卡点。"""
     with db_cursor() as cur:
         cur.execute(
-            "SELECT id, member_id FROM members WHERE id=%s AND org_id=%s AND role='student'",
+            "SELECT id FROM members WHERE id=%s AND org_id=%s AND role='student'",
             (student_id, org_id))
         if not cur.fetchone(): raise HTTPException(404, "学生不存在")
         cur.execute(

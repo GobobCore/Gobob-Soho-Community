@@ -220,35 +220,126 @@ class DeliverableCreate(BaseModel):
 @router.post("/deliverables")
 def create_deliverable(req: DeliverableCreate, user: dict = Depends(auth.require_staff),
                        org_id: str = Depends(get_org_id)):
+    """建交付物骨架（d1），同时落首个版本 v1（draft 状态）。"""
     did = new_id()
-    with db_cursor() as cur:
+    vid = new_id()
+    with db_transaction() as cur:
         cur.execute(
             """INSERT INTO deliverables
                (id, org_id, assignment_id, student_member_id, advisor_member_id, title,
-                module_code, status, content, file_url)
-               VALUES (%s,%s,%s,%s,%s,%s,%s,'draft',%s,%s)""",
+                module_code, status, content, file_url, current_version_id)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,'draft',%s,%s,%s)""",
             (did, org_id, req.assignment_id, req.student_member_id, user.get("member_id"),
-             req.title, req.module_code, req.content, req.file_url))
-    return {"deliverable_id": did}
+             req.title, req.module_code, req.content, req.file_url, vid))
+        cur.execute(
+            """INSERT INTO deliverable_versions
+               (id, org_id, deliverable_id, version, content, file_url, submitted_by)
+               VALUES (%s,%s,%s,1,%s,%s,%s)""",
+            (vid, org_id, did, req.content, req.file_url, user.get("member_id")))
+    return {"deliverable_id": did, "version_id": vid, "version": 1}
 
 
-class DeliverableStatusReq(BaseModel):
-    status: str  # draft/in_review/revised/accepted
+class DeliverableVersionReq(BaseModel):
+    content: str | None = None
+    file_url: str | None = None
+    submit: bool = False  # True=提交审阅（draft → in_review）
 
 
-@router.post("/deliverables/{did}/status")
-def update_deliverable(did: str, req: DeliverableStatusReq,
-                       user: dict = Depends(auth.get_current_user), org_id: str = Depends(get_org_id)):
-    if req.status not in ("draft", "in_review", "revised", "accepted"):
-        raise HTTPException(400, "无效状态")
-    submitted = datetime.utcnow() if req.status in ("in_review",) else None
+@router.post("/deliverables/{did}/versions")
+def new_version(did: str, req: DeliverableVersionReq,
+                user: dict = Depends(auth.require_staff), org_id: str = Depends(get_org_id)):
+    """出 v2/v3... 版本。submit=True 时状态变 in_review 并写 submit_at。"""
+    with db_transaction() as cur:
+        cur.execute("SELECT * FROM deliverables WHERE id=%s AND org_id=%s", (did, org_id))
+        d = cur.fetchone()
+        if not d: raise HTTPException(404, "交付物不存在")
+        # 当前最大版本
+        cur.execute(
+            "SELECT COALESCE(MAX(version),0)+1 AS next FROM deliverable_versions WHERE deliverable_id=%s",
+            (did,))
+        v = cur.fetchone()["next"]
+        vid = new_id()
+        now = datetime.utcnow() if req.submit else None
+        cur.execute(
+            """INSERT INTO deliverable_versions
+               (id, org_id, deliverable_id, version, content, file_url, submitted_by, submitted_at)
+               VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""",
+            (vid, org_id, did, v, req.content, req.file_url, user.get("member_id"), now))
+        new_status = "in_review" if req.submit else "draft"
+        cur.execute(
+            """UPDATE deliverables
+               SET current_version_id=%s, status=%s,
+                   content=COALESCE(%s,content), file_url=COALESCE(%s,file_url),
+                   submitted_at=COALESCE(%s,submitted_at)
+               WHERE id=%s""",
+            (vid, new_status, req.content, req.file_url, now, did))
+    return {"version_id": vid, "version": v, "status": new_status}
+
+
+class DeliverableReviewReq(BaseModel):
+    decision: str  # approve/reject/comment
+    content: str = Field(..., min_length=1)
+
+
+@router.post("/deliverables/versions/{vid}/review")
+def review_version(vid: str, req: DeliverableReviewReq,
+                   user: dict = Depends(auth.require_staff), org_id: str = Depends(get_org_id)):
+    """审阅版本：approve→accepted 关联 contract_items；reject→状态回 draft；comment→保留状态。"""
+    if req.decision not in ("approve", "reject", "comment"):
+        raise HTTPException(400, "无效决策")
+    with db_transaction() as cur:
+        cur.execute(
+            """SELECT v.*, d.id AS d_id, d.status, d.student_member_id, d.module_code
+               FROM deliverable_versions v JOIN deliverables d ON d.id=v.deliverable_id
+               WHERE v.id=%s AND v.org_id=%s""", (vid, org_id))
+        v = cur.fetchone()
+        if not v: raise HTTPException(404, "版本不存在")
+        cur.execute(
+            """INSERT INTO deliverable_comments
+               (id, org_id, version_id, reviewer_member_id, reviewer_name, content, decision)
+               VALUES (%s,%s,%s,%s,%s,%s,%s)""",
+            (new_id(), org_id, vid, user.get("member_id"), user.get("name"),
+             req.content, req.decision))
+        if req.decision == "approve":
+            cur.execute("UPDATE deliverables SET status='accepted' WHERE id=%s", (v["d_id"],))
+            # 关联 contract_items：找到该学生该 module_code 的 pending 项 → completed
+            cur.execute(
+                """UPDATE contract_items
+                   SET status='completed', completed_at=NOW(), deliverable_id=%s
+                   WHERE org_id=%s AND student_member_id=%s
+                     AND module_code=%s AND status IN ('pending','in_progress','delivered')
+                   LIMIT 1""",
+                (v["d_id"], org_id, v["student_member_id"], v.get("module_code")))
+        elif req.decision == "reject":
+            # reject 必须有 comment（已强制 min_length=1）
+            cur.execute("UPDATE deliverables SET status='draft' WHERE id=%s", (v["d_id"],))
+    return {"ok": True, "decision": req.decision}
+
+
+@router.get("/deliverables/{did}")
+def deliverable_detail(did: str, user: dict = Depends(auth.get_current_user),
+                       org_id: str = Depends(get_org_id)):
+    """返回交付物 + 全版本 + 审阅意见。"""
     with db_cursor() as cur:
         cur.execute(
-            "UPDATE deliverables SET status=%s, submitted_at=COALESCE(%s,submitted_at) WHERE id=%s AND org_id=%s",
-            (req.status, submitted, did, org_id))
-        if cur.rowcount == 0:
-            raise HTTPException(404, "交付物不存在")
-    return {"ok": True}
+            """SELECT d.*, adv.name AS advisor_name FROM deliverables d
+               LEFT JOIN members adv ON adv.id=d.advisor_member_id
+               WHERE d.id=%s AND d.org_id=%s""", (did, org_id))
+        d = cur.fetchone()
+        if not d: raise HTTPException(404, "交付物不存在")
+        cur.execute(
+            """SELECT v.*, mem.name AS submitted_by_name FROM deliverable_versions v
+               LEFT JOIN members mem ON mem.id=v.submitted_by
+               WHERE v.deliverable_id=%s ORDER BY v.version""", (did,))
+        versions = []
+        for v in cur.fetchall():
+            cur.execute(
+                """SELECT c.*, mem.name AS reviewer_name FROM deliverable_comments c
+                   LEFT JOIN members mem ON mem.id=c.reviewer_member_id
+                   WHERE c.version_id=%s ORDER BY c.created_at""", (v["id"],))
+            v["comments"] = [_row(c) for c in cur.fetchall()]
+            versions.append(_row(v))
+    return {"deliverable": _row(d), "versions": versions}
 
 
 @router.get("/deliverables")
@@ -265,8 +356,11 @@ def list_deliverables(user: dict = Depends(auth.get_current_user), org_id: str =
     sql_where = " AND ".join(where)
     with db_cursor() as cur:
         cur.execute(
-            f"""SELECT d.*, adv.name AS advisor_name FROM deliverables d
+            f"""SELECT d.id, d.title, d.module_code, d.status, d.current_version_id,
+                       d.updated_at, adv.name AS advisor_name, s.name AS student_name
+                FROM deliverables d
                 LEFT JOIN members adv ON adv.id=d.advisor_member_id
+                LEFT JOIN members s ON s.id=d.student_member_id
                 WHERE {sql_where} ORDER BY d.updated_at DESC""", params)
         rows = [_row(r) for r in cur.fetchall()]
     return {"items": rows}

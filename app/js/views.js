@@ -154,6 +154,8 @@
       mode: "board", board: null, list: [], stages: [],
       selected: null, detail: null, showNew: false,
       newLead: { student_name: "", student_phone: "", parent_name: "", parent_phone: "", source: "转介绍", notes: "" },
+      duplicates: [],  // Phase 5 录入查重
+      openExisting: null,  // Phase 5 疑似重复后跳到已有线索
       saving: false,
     }),
     template: `
@@ -232,6 +234,22 @@
         </div>
       </div>
 
+      <!-- Phase 5: 录入查重结果卡片 -->
+      <div v-if="duplicates.length" class="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
+        <div class="text-sm font-medium text-amber-800 mb-2">⚠ 发现 {{ duplicates.length }} 条疑似重复线索</div>
+        <div v-for="d in duplicates" :key="d.lead_id" class="bg-white border rounded-lg p-2 mb-2 text-sm flex justify-between items-center">
+          <div>
+            <span class="font-medium">{{ d.student_name }}</span>
+            <span class="text-xs text-slate-500 ml-2">{{ d._match_reason }} · 状态 {{ d.status }}</span>
+            <span class="text-xs text-slate-400 ml-2">归属 {{ d.assigned_advisor_id || '未分配' }}</span>
+          </div>
+          <div class="flex gap-2">
+            <button @click="openExisting = d; selected = d; showNew = false" class="text-xs text-blue-600">打开</button>
+          </div>
+        </div>
+        <button @click="duplicates=[]" class="text-xs text-slate-500 underline">忽略，仍要新建</button>
+      </div>
+
       <!-- 详情抽屉 -->
       <lead-detail v-if="selected" :lead-id="selected.lead_id" :ctx="ctx" @close="selected=null;load()" @changed="load"></lead-detail>
     </div>`,
@@ -251,11 +269,18 @@
         if (!this.newLead.student_name) { this.ctx.toast("请填学生姓名", "error"); return; }
         this.saving = true;
         try {
-          await S().post("/api/leads", this.newLead);
-          this.ctx.toast("线索已录入");
-          this.showNew = false;
-          this.newLead = { student_name: "", student_phone: "", parent_name: "", parent_phone: "", source: "转介绍", notes: "" };
-          this.load();
+          const r = await S().post("/api/leads", this.newLead);
+          // Phase 5: 录入查重返回
+          if (r.duplicates && r.duplicates.length) {
+            this.duplicates = r.duplicates;
+            this.ctx.toast(`已保存，但发现 ${r.duplicates.length} 条疑似重复`, "ok");
+            this.load();
+          } else {
+            this.ctx.toast("线索已录入");
+            this.showNew = false;
+            this.newLead = { student_name: "", student_phone: "", parent_name: "", parent_phone: "", source: "转介绍", notes: "" };
+            this.load();
+          }
         } catch (e) { this.ctx.toast(e.message, "error"); }
         this.saving = false;
       },
@@ -573,9 +598,11 @@
     props: ["ctx"],
     data: () => ({
       items: [], modules: [], students: [], showNew: false, detail: null,
-      form: { student_member_id: "", modules: [], total_amount: "", signed_date: new Date().toISOString().slice(0, 10), notes: "" },
+      // Phase 5: items 数组（每模块独立金额），不是 modules 字符串数组
+      form: { student_member_id: "", items: [], signed_date: new Date().toISOString().slice(0, 10), notes: "" },
       pay: { amount: "", pay_type: "定金", pay_method: "微信", paid_at: new Date().toISOString().slice(0, 10) },
       saving: false,
+      renew: { open: false, target: null, extend_months: 6, new_items: [] },  // Phase 5 续约
     }),
     template: `
     <div>
@@ -588,7 +615,7 @@
         <empty v-if="!items.length" text="暂无合同"></empty>
         <table v-else class="w-full text-sm">
           <thead><tr class="text-left text-slate-400 text-xs border-b border-slate-100">
-            <th class="py-2">合同号</th><th>学生</th><th>金额</th><th>已收</th><th>状态</th><th>签约日期</th>
+            <th class="py-2">合同号</th><th>学生</th><th>金额</th><th>已收</th><th>状态</th><th>签约日期</th><th></th>
           </tr></thead>
           <tbody>
             <tr v-for="c in items" :key="c.id" @click="openDetail(c.id)" class="border-b border-slate-50 hover:bg-slate-50 cursor-pointer">
@@ -598,6 +625,7 @@
               <td :class="c.paid_amount>=c.total_amount?'text-emerald-600':'text-amber-600'">{{ ctx.shared.fmtMoney(c.paid_amount) }}</td>
               <td><tag :label="ctx.shared.CONTRACT_STATUS_LABEL[c.status]" :color="c.status==='active'?'blue':(c.status==='completed'?'green':'red')"></tag></td>
               <td class="text-slate-400 text-xs">{{ ctx.shared.fmtDate(c.signed_date) }}</td>
+              <td class="text-xs text-slate-400">{{ (c.items||[]).length }} 项</td>
             </tr>
           </tbody>
         </table>
@@ -613,20 +641,70 @@
               <option v-for="s in students" :value="s.id">{{ s.name }}</option>
             </select>
             <div>
-              <div class="text-xs text-slate-400 mb-1.5">服务包（勾选模块）*</div>
-              <div class="grid grid-cols-2 gap-1.5 max-h-48 overflow-y-auto border rounded-lg p-2">
-                <label v-for="m in modules" :key="m.code" class="flex items-center gap-1.5 text-sm cursor-pointer hover:bg-slate-50 rounded px-1.5 py-1">
-                  <input type="checkbox" :value="m.code" v-model="form.modules" /> {{ m.name_zh }}
-                </label>
+              <div class="text-xs text-slate-400 mb-1.5">服务包（每项独立填金额，合计=合同总额）*</div>
+              <div class="space-y-1.5 max-h-64 overflow-y-auto border rounded-lg p-2">
+                <div v-for="m in modules" :key="m.code" class="flex items-center gap-2">
+                  <label class="flex items-center gap-1.5 text-sm flex-1 cursor-pointer">
+                    <input type="checkbox" :value="m.code"
+                           :checked="form.items.find(it=>it.module_code===m.code)"
+                           @change="toggleItem(m.code, m.base_price||0, $event.target.checked)" />
+                    {{ m.name_zh }}
+                  </label>
+                  <input v-if="form.items.find(it=>it.module_code===m.code)"
+                         type="number" :value="form.items.find(it=>it.module_code===m.code).amount"
+                         @input="updateItemAmount(m.code, $event.target.value)"
+                         class="w-24 border rounded px-2 py-1 text-right" placeholder="¥" />
+                </div>
+              </div>
+              <div class="text-xs text-slate-500 mt-1.5 flex justify-between">
+                <span>已选 {{ form.items.length }} 项</span>
+                <span>合计：<b class="text-blue-600">¥{{ form.items.reduce((s,i)=>s+(+i.amount||0),0).toLocaleString() }}</b></span>
               </div>
             </div>
-            <input v-model.number="form.total_amount" type="number" placeholder="合同总额（元）*" class="w-full border rounded-lg px-3 py-2" />
             <div><div class="text-xs text-slate-400 mb-1">签约日期</div><input v-model="form.signed_date" type="date" class="w-full border rounded-lg px-3 py-2" /></div>
             <textarea v-model="form.notes" placeholder="备注" class="w-full border rounded-lg px-3 py-2" rows="2"></textarea>
           </div>
           <div class="flex gap-2 mt-5">
             <button @click="showNew=false" class="flex-1 border rounded-lg py-2 text-sm">取消</button>
             <button @click="saveNew" :disabled="saving" class="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm disabled:opacity-50">{{ saving?'…':'创建' }}</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 5: 续约弹窗 -->
+      <div v-if="renew.open" class="fixed inset-0 bg-black/40 flex items-center justify-center z-40 p-4" @click.self="renew.open=false">
+        <div class="bg-white rounded-2xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto">
+          <h3 class="font-bold mb-1">续约</h3>
+          <div class="text-xs text-slate-500 mb-4">基于原合同 {{ renew.target && renew.target.contract_no }} 创建新合同</div>
+          <div class="text-sm space-y-3">
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-slate-400 w-20">延期</span>
+              <input v-model.number="renew.extend_months" type="number" min="1" max="36" class="w-20 border rounded px-2 py-1" />
+              <span class="text-xs text-slate-500">月</span>
+            </div>
+            <div>
+              <div class="text-xs text-slate-400 mb-1.5">服务包（可调整）</div>
+              <div class="space-y-1.5 border rounded-lg p-2 max-h-48 overflow-y-auto">
+                <div v-for="m in modules" :key="m.code" class="flex items-center gap-2">
+                  <label class="flex items-center gap-1.5 text-sm flex-1">
+                    <input type="checkbox" :checked="renew.new_items.find(it=>it.module_code===m.code)"
+                           @change="toggleRenewItem(m.code, $event.target.checked)" />
+                    {{ m.name_zh }}
+                  </label>
+                  <input v-if="renew.new_items.find(it=>it.module_code===m.code)"
+                         type="number" :value="renew.new_items.find(it=>it.module_code===m.code).amount"
+                         @input="updateRenewItemAmount(m.code, $event.target.value)"
+                         class="w-24 border rounded px-2 py-1 text-right" />
+                </div>
+              </div>
+              <div class="text-xs text-slate-500 mt-1.5 text-right">
+                合计：<b class="text-blue-600">¥{{ renew.new_items.reduce((s,i)=>s+(+i.amount||0),0).toLocaleString() }}</b>
+              </div>
+            </div>
+          </div>
+          <div class="flex gap-2 mt-5">
+            <button @click="renew.open=false" class="flex-1 border rounded-lg py-2 text-sm">取消</button>
+            <button @click="doRenew" :disabled="saving" class="flex-1 bg-blue-600 text-white rounded-lg py-2 text-sm disabled:opacity-50">{{ saving?'…':'续约' }}</button>
           </div>
         </div>
       </div>
@@ -644,6 +722,28 @@
             <div><span class="text-slate-400">总额</span> {{ ctx.shared.fmtMoney(detail.total_amount) }}</div>
             <div><span class="text-slate-400">已收</span> <span class="text-emerald-600 font-medium">{{ ctx.shared.fmtMoney(detail.paid_amount) }}</span></div>
             <div><span class="text-slate-400">待收</span> <span class="text-amber-600">{{ ctx.shared.fmtMoney(detail.total_amount - detail.paid_amount) }}</span></div>
+          </div>
+
+          <!-- Phase 5: 服务项明细 -->
+          <div v-if="detail.items && detail.items.length" class="mb-4">
+            <div class="text-sm font-semibold mb-2">服务项（{{ detail.items.length }}）</div>
+            <div class="space-y-1.5">
+              <div v-for="it in detail.items" :key="it.id" class="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2 text-sm">
+                <div>
+                  <span class="font-medium">{{ (modules.find(m=>m.code===it.module_code)||{}).name_zh || it.module_code }}</span>
+                  <span class="ml-2 text-xs text-slate-500">{{ ctx.shared.fmtMoney(it.amount) }}</span>
+                </div>
+                <tag :label="({pending:'待启动',in_progress:'进行中',delivered:'已交付',completed:'已完成',cancelled:'已取消',refunded:'已退'})[it.status]||it.status"
+                      :color="({completed:'green',in_progress:'blue',delivered:'purple',refunded:'red',cancelled:'slate'})[it.status]||'amber'"></tag>
+              </div>
+            </div>
+          </div>
+
+          <!-- Phase 5: 续约按钮（活跃合同） -->
+          <div v-if="detail.status==='active'" class="mb-4">
+            <button @click="startRenew(detail)" class="w-full border border-blue-200 text-blue-600 rounded-lg py-2 text-sm hover:bg-blue-50">
+              续约此合同
+            </button>
           </div>
           <div class="text-sm font-semibold mb-2">收款登记</div>
           <div class="space-y-2 mb-4 text-sm">
@@ -675,10 +775,62 @@
         } catch (e) { this.ctx.toast(e.message, "error"); }
       },
       async saveNew() {
-        if (!this.form.student_member_id || !this.form.modules.length || !this.form.total_amount) { this.ctx.toast("请填学生/服务包/金额", "error"); return; }
+        if (!this.form.student_member_id || !this.form.items.length) {
+          this.ctx.toast("请选学生 + 至少勾一个服务项", "error"); return;
+        }
         this.saving = true;
-        try { await S().post("/api/contracts", this.form); this.ctx.toast("合同已创建"); this.showNew = false; this.load(); }
-        catch (e) { this.ctx.toast(e.message, "error"); }
+        try {
+          await S().post("/api/contracts", this.form);
+          this.ctx.toast("合同已创建"); this.showNew = false;
+          this.form = { student_member_id: "", items: [], signed_date: new Date().toISOString().slice(0, 10), notes: "" };
+          this.load();
+        } catch (e) { this.ctx.toast(e.message, "error"); }
+        this.saving = false;
+      },
+      // Phase 5: 勾选/取消服务项
+      toggleItem(code, defaultAmount, checked) {
+        if (checked) {
+          this.form.items.push({ module_code: code, amount: defaultAmount });
+        } else {
+          this.form.items = this.form.items.filter(it => it.module_code !== code);
+        }
+      },
+      updateItemAmount(code, val) {
+        const it = this.form.items.find(x => x.module_code === code);
+        if (it) it.amount = +val || 0;
+      },
+      // Phase 5: 续约
+      startRenew(c) {
+        this.renew.target = c;
+        this.renew.extend_months = 6;
+        // 默认拷贝原合同服务项（带金额）
+        this.renew.new_items = (c.items || []).map(it => ({ module_code: it.module_code, amount: it.amount }));
+        this.renew.open = true;
+      },
+      toggleRenewItem(code, checked) {
+        const has = this.renew.new_items.find(it => it.module_code === code);
+        if (checked && !has) {
+          const m = this.modules.find(x => x.code === code);
+          this.renew.new_items.push({ module_code: code, amount: m ? m.base_price || 0 : 0 });
+        } else if (!checked && has) {
+          this.renew.new_items = this.renew.new_items.filter(it => it.module_code !== code);
+        }
+      },
+      updateRenewItemAmount(code, val) {
+        const it = this.renew.new_items.find(x => x.module_code === code);
+        if (it) it.amount = +val || 0;
+      },
+      async doRenew() {
+        if (!this.renew.new_items.length) { this.ctx.toast("请勾至少一项", "error"); return; }
+        this.saving = true;
+        try {
+          const r = await S().post(`/api/contracts/${this.renew.target.id}/renew`,
+                                    { extend_months: this.renew.extend_months,
+                                      new_items: this.renew.new_items });
+          this.ctx.toast("续约成功：" + r.new_contract_no);
+          this.renew.open = false;
+          this.load();
+        } catch (e) { this.ctx.toast(e.message, "error"); }
         this.saving = false;
       },
       async openDetail(id) {

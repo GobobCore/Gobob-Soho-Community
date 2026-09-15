@@ -19,7 +19,7 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("soho")
 settings = get_settings()
 
-app = FastAPI(title="Gobob SOHO API", version="0.1.0")
+app = FastAPI(title="Gobob SOHO API", version="0.1.0", redirect_slashes=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -89,9 +89,9 @@ def startup():
 # ── 路由挂载 ──
 from api import (  # noqa: E402
     assessment, auth_router, assignments, contracts, dashboard,
-    leads, messages, staff, students, templates, workflow,
+    leads, messages, relationships, reports, staff, students, templates, workflow,
 )
 
 for _r in (auth_router, assessment, leads, contracts, assignments, students,
-           workflow, templates, staff, dashboard, messages):
+           workflow, templates, staff, dashboard, messages, relationships, reports):
     app.include_router(_r.router)

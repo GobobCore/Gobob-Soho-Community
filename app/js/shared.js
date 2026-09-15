@@ -17,12 +17,17 @@ window.SohoShared = (function () {
   }
 
   async function api(path, opts = {}) {
+    // 后端 redirect_slashes=True，POST 不带 / 会 307，浏览器不自动 follow
+    // 统一规范化：POST/PUT/DELETE 强制带 /
+    let p = path;
+    const m = (opts.method || "GET").toUpperCase();
+    if (m !== "GET" && p.indexOf("?") === -1 && !p.endsWith("/")) p += "/";
     const headers = { "Content-Type": "application/json", ...(opts.headers || {}) };
     const tok = getToken();
     if (tok) headers["Authorization"] = "Bearer " + tok;
     let res;
     try {
-      res = await fetch(path, { ...opts, headers });
+      res = await fetch(p, { ...opts, headers, redirect: "follow" });
     } catch (e) {
       throw new Error("网络错误：" + e.message);
     }

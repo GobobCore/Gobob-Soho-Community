@@ -1,0 +1,59 @@
+name: gobob-soho
+
+services:
+  mysql:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${SOHO_MYSQL_DB:-gobob_soho}
+      MYSQL_USER: ${SOHO_MYSQL_USER:-soho}
+      MYSQL_PASSWORD: ${SOHO_MYSQL_PASS}
+    volumes:
+      - soho-mysql:/var/lib/mysql
+      # 首次启动自动建表 + 种子
+      - ../backend/sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ../backend/sql/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SOHO_MYSQL_HOST: mysql
+      SOHO_MYSQL_PORT: "3306"
+      SOHO_MYSQL_DB: ${SOHO_MYSQL_DB:-gobob_soho}
+      SOHO_MYSQL_USER: ${SOHO_MYSQL_USER:-soho}
+      SOHO_MYSQL_PASS: ${SOHO_MYSQL_PASS}
+      SOHO_JWT_SECRET: ${SOHO_JWT_SECRET}
+      SOHO_JWT_EXPIRE_HOURS: ${SOHO_JWT_EXPIRE_HOURS:-72}
+      SOHO_ADMIN_USERNAME: ${SOHO_ADMIN_USERNAME:-admin}
+      SOHO_ADMIN_PASSWORD: ${SOHO_ADMIN_PASSWORD}
+      SOHO_ORG_NAME: ${SOHO_ORG_NAME:-我的留学工作室}
+      GOBOB_API_BASE: ${GOBOB_API_BASE:-https://api.gobob.cn}
+      GOBOB_API_KEY: ${GOBOB_API_KEY:-}
+    ports:
+      - "${SOHO_BACKEND_PORT:-19001}:19001"
+    volumes:
+      - soho-files:/app/data
+
+  # 前端 portal / app 在 Phase 2/3 加入
+  # portal:
+  #   build: { context: .., dockerfile: deploy/Dockerfile.portal }
+  #   ports: ["${SOHO_PORTAL_PORT:-19002}:19002"]
+  # app:
+  #   build: { context: .., dockerfile: deploy/Dockerfile.app }
+  #   ports: ["${SOHO_APP_PORT:-19003}:19003"]
+
+volumes:
+  soho-mysql:
+  soho-files:

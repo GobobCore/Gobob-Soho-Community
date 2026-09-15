@@ -44,6 +44,7 @@ def login(req: LoginReq):
             "name": mem["name"] if mem else acc["username"],
             "role": role,
             "org_id": acc["org_id"],
+            "member_id": mem["id"] if mem else None,
             "is_admin": role == auth.ROLE_OWNER,
         },
     }

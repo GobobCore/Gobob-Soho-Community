@@ -67,7 +67,7 @@ def list_staff(user: dict = Depends(auth.require_owner), org_id: str = Depends(g
                    WHERE sa.advisor_member_id=m.id AND sa.status='active') AS active_students,
                  (SELECT COUNT(*) FROM deliverables d WHERE d.advisor_member_id=m.id
                    AND d.status IN ('in_review','accepted')
-                   AND DATE_FORMAT(d.submitted_at,'%Y-%m')=DATE_FORMAT(NOW(),'%Y-%m')) AS month_deliverables,
+                   AND DATE_FORMAT(d.submitted_at,'%%Y-%%m')=DATE_FORMAT(NOW(),'%%Y-%%m')) AS month_deliverables,
                  (SELECT COUNT(*) FROM leads l WHERE l.assigned_advisor_id=m.id AND l.is_recycled=0) AS leads_count
                FROM members m
                WHERE m.org_id=%s AND m.role IN ('owner','advisor')

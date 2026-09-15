@@ -130,22 +130,22 @@ def capture_lead(req: LeadCreate):
 def list_leads(user: dict = Depends(auth.require_staff), org_id: str = Depends(get_org_id),
                status: str | None = None, q: str | None = None,
                page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200)):
-    where = ["org_id=%s", "is_recycled=0"]
+    where = ["l.org_id=%s", "l.is_recycled=0"]
     params = [org_id]
     if not _can_see_all(user):  # advisor 只看自己名下
-        where.append("assigned_advisor_id=%s")
+        where.append("l.assigned_advisor_id=%s")
         params.append(user.get("member_id"))
     if status:
-        where.append("status=%s")
+        where.append("l.status=%s")
         params.append(status)
     if q:
-        where.append("(student_name LIKE %s OR student_phone LIKE %s OR student_wechat LIKE %s)")
+        where.append("(l.student_name LIKE %s OR l.student_phone LIKE %s OR l.student_wechat LIKE %s)")
         like = f"%{q}%"
         params.extend([like, like, like])
     sql_where = " AND ".join(where)
     offset = (page - 1) * page_size
     with db_cursor() as cur:
-        cur.execute(f"SELECT COUNT(*) AS c FROM leads WHERE {sql_where}", params)
+        cur.execute(f"SELECT COUNT(*) AS c FROM leads l WHERE {sql_where}", params)
         total = cur.fetchone()["c"]
         cur.execute(
             f"""SELECT l.*, m.name AS advisor_name
@@ -160,12 +160,13 @@ def list_leads(user: dict = Depends(auth.require_staff), org_id: str = Depends(g
 
 @router.get("/board")
 def pipeline_board(user: dict = Depends(auth.require_staff), org_id: str = Depends(get_org_id)):
-    """看板：按 pipeline 阶段分组。"""
+    """看板：按 pipeline 阶段分组（stage 用 status 键关联，而非中文名）。"""
     where = "l.org_id=%s AND l.is_recycled=0"
     params = [org_id]
     if not _can_see_all(user):
         where += " AND l.assigned_advisor_id=%s"
         params.append(user.get("member_id"))
+    # stage_id 形如 st_new → 线索 status 键 'new'
     with db_cursor() as cur:
         cur.execute(
             "SELECT stage_id, name, sort_order FROM lead_pipeline_stages WHERE org_id=%s ORDER BY sort_order",
@@ -180,14 +181,17 @@ def pipeline_board(user: dict = Depends(auth.require_staff), org_id: str = Depen
             params,
         )
         leads = [_row_to_dict(r) for r in cur.fetchall()]
+    # stage_id 'st_new' → status 'new'；每个阶段容器挂 status 键
     board = {}
     for s in stages:
-        board[s["name"]] = {"stage_id": s["stage_id"], "leads": []}
+        skey = s["stage_id"].replace("st_", "", 1)
+        board[skey] = {"stage_id": s["stage_id"], "name": s["name"], "status": skey, "leads": []}
     for l in leads:
         st = l["status"]
-        # 匹配阶段名（status 与 name 约定一致：new→新线索 等）；简化用 status 直挂
-        board.setdefault(st, {"stage_id": None, "leads": []})["leads"].append(l)
-    return {"stages": stages, "board": board}
+        board.setdefault(st, {"stage_id": None, "name": st, "status": st, "leads": []})["leads"].append(l)
+    # 输出有序阶段（含 status 键）
+    ordered = [{"stage_id": s["stage_id"], "name": s["name"], "status": s["stage_id"].replace("st_", "", 1)} for s in stages]
+    return {"stages": ordered, "board": board}
 
 
 @router.get("/{lead_id}")

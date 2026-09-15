@@ -106,17 +106,25 @@ def create_contract(req: ContractCreate, user: dict = Depends(auth.require_staff
 
 
 @router.get("")
-def list_contracts(user: dict = Depends(auth.require_staff), org_id: str = Depends(get_org_id),
+def list_contracts(user: dict = Depends(auth.get_current_user), org_id: str = Depends(get_org_id),
                    status: str | None = None, student_id: str | None = None,
                    page: int = Query(1, ge=1), page_size: int = Query(50, ge=1, le=200)):
     where = ["c.org_id=%s"]
     params = [org_id]
+    # 学生/家长只能看自己（或孩子）的合同
+    if user["role"] == auth.ROLE_STUDENT:
+        where.append("c.student_member_id=%s")
+        params.append(user.get("member_id"))
+    elif user["role"] == auth.ROLE_PARENT:
+        where.append("""c.student_member_id IN (SELECT to_member_id FROM member_relationships
+                        WHERE from_member_id=%s AND org_id=%s)""")
+        params.extend([user.get("member_id"), org_id])
+    elif student_id:  # 员工按学生筛
+        where.append("c.student_member_id=%s")
+        params.append(student_id)
     if status:
         where.append("c.status=%s")
         params.append(status)
-    if student_id:
-        where.append("c.student_member_id=%s")
-        params.append(student_id)
     sql_where = " AND ".join(where)
     offset = (page - 1) * page_size
     with db_cursor() as cur:

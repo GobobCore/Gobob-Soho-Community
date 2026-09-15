@@ -215,7 +215,7 @@ def list_leads(user: dict = Depends(auth.require_staff), org_id: str = Depends(g
 @router.get("/board")
 def pipeline_board(user: dict = Depends(auth.require_staff), org_id: str = Depends(get_org_id)):
     """看板：按 pipeline 阶段分组（status 键关联）。含公海列（recycled）。"""
-    where = "l.org_id=%s AND l.is_recycled=0"
+    where = "l.org_id=%s"
     params = [org_id]
     if not _can_see_all(user):
         where += " AND l.assigned_advisor_id=%s"
@@ -223,9 +223,10 @@ def pipeline_board(user: dict = Depends(auth.require_staff), org_id: str = Depen
     with db_cursor() as cur:
         cur.execute("SELECT stage_id, name, sort_order FROM lead_pipeline_stages WHERE org_id=%s ORDER BY sort_order", (org_id,))
         stages = cur.fetchall()
+        # 查全部（含公海），公海 is_recycled=1
         cur.execute(
             f"""SELECT l.lead_id, l.student_name, l.status, l.priority, l.source,
-                       l.next_contact_at, l.assigned_advisor_id, m.name AS advisor_name
+                       l.next_contact_at, l.assigned_advisor_id, l.is_recycled, m.name AS advisor_name
                 FROM leads l LEFT JOIN members m ON m.id=l.assigned_advisor_id
                 WHERE {where} ORDER BY l.priority DESC, l.updated_at DESC""", params)
         leads = [_row_to_dict(r) for r in cur.fetchall()]
@@ -233,10 +234,16 @@ def pipeline_board(user: dict = Depends(auth.require_staff), org_id: str = Depen
     for s in stages:
         skey = s["stage_id"].replace("st_", "", 1)
         board[skey] = {"stage_id": s["stage_id"], "name": s["name"], "status": skey, "leads": []}
+    # 公海列（is_recycled=1 或 status='recycled'）
+    board["recycled"] = {"stage_id": "st_recycled", "name": "公海", "status": "recycled", "leads": []}
     for l in leads:
+        if l.get("is_recycled") == 1:
+            board["recycled"]["leads"].append(l)
+            continue
         st = l["status"]
         board.setdefault(st, {"stage_id": None, "name": st, "status": st, "leads": []})["leads"].append(l)
     ordered = [{"stage_id": s["stage_id"], "name": s["name"], "status": s["stage_id"].replace("st_", "", 1)} for s in stages]
+    ordered.append({"stage_id": "st_recycled", "name": "公海", "status": "recycled"})
     return {"stages": ordered, "board": board}
 
 

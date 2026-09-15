@@ -42,6 +42,12 @@
           </template>
         </nav>
         <div class="border-t border-slate-200 p-3">
+          <!-- Phase 5: 家长多学生切换 -->
+          <div v-if="role === 'parent' && myStudents.length > 1" class="mb-2">
+            <select v-model="activeStudentId" @change="switchStudent" class="w-full text-xs border rounded-lg px-2 py-1.5">
+              <option v-for="s in myStudents" :value="s.id">{{ s.name }}</option>
+            </select>
+          </div>
           <div class="text-sm font-medium">{{ user.name || user.username }}</div>
           <div class="text-xs text-slate-400 mb-2">{{ roleLabel }}</div>
           <button @click="logout" class="text-xs text-red-500 hover:underline">退出登录</button>

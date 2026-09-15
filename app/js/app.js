@@ -14,6 +14,7 @@
       "student-detail": V.StudentDetail,
       "contracts-view": V.ContractsView,
       "staff-view": V.StaffView,
+      "collisions-view": V.CollisionsView,
       "reports-view": V.ReportsView,
       "settings-view": V.SettingsView,
       "my-progress-view": V.MyProgressView,
@@ -25,9 +26,12 @@
     data() {
       return {
         currentView: "",
-        loggedIn: !!S.getToken(),  // 响应式登录态（替代模板里直调 S.getToken() 不响应的问题）
+        loggedIn: !!S.getToken(),  // 响应式登录态
         toast: { msg: "", type: "ok" },
         user: S.getUser() || {},
+        // Phase 5: 家长多学生切换
+        myStudents: [],          // 家长关联的所有学生
+        activeStudentId: null,   // 当前选中的学生
       };
     },
     computed: {
@@ -35,8 +39,17 @@
       roleLabel() {
         return { owner: "主管", advisor: "顾问", student: "学生", parent: "家长" }[this.user.role] || "";
       },
+      // Phase 5: 家长角色判断（用于学生切换器显隐）
+      role() { return this.user.role; },
       ctx() {
-        return { shared: S, toast: this.showToast, go: this.go };
+        return {
+          shared: S,
+          toast: this.showToast,
+          go: this.go,
+          // Phase 5: 让家长端视图知道当前选中的学生
+          activeStudentId: this.activeStudentId,
+          myStudents: this.myStudents,
+        };
       },
       // 导航按角色分组（即时计算当前角色，不用挂载期缓存的 S.isStaff）
       navGroups() {
@@ -55,6 +68,7 @@
           if (isOwner) {
             g.push({ title: "管理", items: [
               { view: "staff", label: "员工", icon: "👥" },
+              { view: "collisions", label: "撞单", icon: "⚡" },
               { view: "reports", label: "报表", icon: "📈" },
               { view: "settings", label: "设置", icon: "⚙️" },
             ] });
@@ -94,6 +108,7 @@
       onLoggedIn() {
         this.user = S.getUser() || {};
         this.loggedIn = true;
+        this.loadMyStudents();
         this.go(this.isStaffNow ? "dashboard" : "my-progress");
       },
       logout() {
@@ -102,6 +117,30 @@
         this.currentView = "";
         this.loggedIn = false;
         this.user = {};
+        this.myStudents = [];
+        this.activeStudentId = null;
+      },
+      // Phase 5: 家长多学生
+      async loadMyStudents() {
+        if (this.user.role !== "parent") return;
+        try {
+          const d = await S.get(`/api/relationships/parent/${this.user.member_id}/students`);
+          this.myStudents = d.students || [];
+          if (this.myStudents.length) {
+            // 默认选第一个（或 localStorage 记忆）
+            const saved = localStorage.getItem("soho_active_student");
+            const valid = this.myStudents.find(s => s.id === saved);
+            this.activeStudentId = (valid || this.myStudents[0]).id;
+          }
+        } catch (e) { /* 家长可能还没关联，静默 */ }
+      },
+      switchStudent() {
+        localStorage.setItem("soho_active_student", this.activeStudentId);
+        // 强制当前视图重载
+        this.currentView = "";
+        this.$nextTick(() => {
+          this.currentView = this.isStaffNow ? "dashboard" : "my-progress";
+        });
       },
     },
     mounted() {
@@ -109,6 +148,7 @@
       const h = location.hash.replace(/^#\//, "");
       if (this.loggedIn) {
         this.user = S.getUser() || {};
+        this.loadMyStudents();  // Phase 5
         const allowed = this.navGroups.flatMap(g => g.items.map(i => i.view));
         this.currentView = allowed.includes(h) ? h : (this.isStaffNow ? "dashboard" : "my-progress");
       }

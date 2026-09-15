@@ -29,15 +29,28 @@ def _row(row) -> dict:
 
 
 def _resolve_student(user: dict, org_id: str, member_id: str | None) -> str:
-    """解析目标学生：学生本人/家长孩子/员工指定。"""
+    """解析目标学生：学生本人/家长孩子（可指定）/员工指定。
+
+    员工/学生：member_id 指定或默认自己。
+    家长：member_id 不传 → 默认第一个关联学生；传了则校验是否关联（防越权）。
+    """
     if user["role"] in (auth.ROLE_OWNER, auth.ROLE_ADVISOR):
         if not member_id:
             raise HTTPException(400, "需指定 student_id")
         return member_id
-    # 学生
     if user["role"] == auth.ROLE_STUDENT:
         return user.get("member_id")
-    # 家长 → 孩子
+    # 家长：可指定某个孩子（多孩子场景）
+    if member_id:
+        with db_cursor() as cur:
+            cur.execute(
+                """SELECT 1 FROM member_relationships
+                   WHERE from_member_id=%s AND to_member_id=%s AND org_id=%s""",
+                (user.get("member_id"), member_id, org_id))
+            if not cur.fetchone():
+                raise HTTPException(403, "该学生与你无关联")
+        return member_id
+    # 默认第一个孩子
     with db_cursor() as cur:
         cur.execute("SELECT to_member_id FROM member_relationships WHERE from_member_id=%s AND org_id=%s LIMIT 1",
                     (user.get("member_id"), org_id))

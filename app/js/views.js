@@ -191,6 +191,25 @@
             <empty v-if="!(board[st.status]||{leads:[]}).leads.length" text=""></empty>
           </div>
         </div>
+        <!-- Phase 5: 公海列 -->
+        <div class="w-60 flex-shrink-0">
+          <div class="text-sm font-semibold text-slate-600 mb-2 flex items-center justify-between">
+            <span>公海 <span class="text-xs text-amber-600">(回收)</span></span>
+            <span class="text-xs text-slate-400">{{ (board['recycled']||{leads:[]}).leads.length }}</span>
+          </div>
+          <div class="bg-amber-50 border border-amber-200 rounded-xl p-2 min-h-[300px] space-y-2">
+            <div v-for="l in (board['recycled']||{leads:[]}).leads" :key="l.lead_id"
+                 @click="openDetail(l)"
+                 class="kanban-card bg-white rounded-lg p-3 cursor-pointer border-l-4 border-amber-300">
+              <div class="font-medium text-sm">{{ l.student_name || '未命名' }}</div>
+              <div class="text-xs text-slate-400 mt-1 flex justify-between items-center">
+                <span>{{ l.advisor_name || '公海' }}</span>
+                <button @click.stop="claimLead(l)" class="text-xs text-blue-600 hover:underline">认领</button>
+              </div>
+            </div>
+            <empty v-if="!(board['recycled']||{leads:[]}).leads.length" text=""></empty>
+          </div>
+        </div>
       </div>
 
       <!-- 列表 -->
@@ -265,6 +284,19 @@
         } catch (e) { this.ctx.toast(e.message, "error"); }
       },
       openDetail(l) { this.selected = l; },
+      async claimLead(l) {
+        try {
+          // advisor 认领自己；owner 需传 advisor_id（这里简化：owner 先打开详情抽屉选顾问）
+          if (this.ctx.shared.isStaff && !this.ctx.shared.isOwner) {
+            await S().post(`/api/leads/${l.lead_id}/claim`, {});
+            this.ctx.toast("已认领");
+            this.load();
+          } else {
+            this.ctx.toast("请先打开详情，在'分配'里选目标顾问", "error");
+            this.openDetail(l);
+          }
+        } catch (e) { this.ctx.toast(e.message, "error"); }
+      },
       async saveNew() {
         if (!this.newLead.student_name) { this.ctx.toast("请填学生姓名", "error"); return; }
         this.saving = true;
@@ -292,7 +324,11 @@
     components: { Tag, Empty },
     props: ["leadId", "ctx"],
     emits: ["close", "changed"],
-    data: () => ({ lead: null, activities: [], advisors: [], act: { activity_type: "wechat", subject: "", content: "", contact_type: "student", outcome: "interested" }, saving: false }),
+    data: () => ({ lead: null, activities: [], advisors: [],
+      act: { activity_type: "wechat", subject: "", content: "", contact_type: "student", outcome: "interested" },
+      // Phase 5: 流失弹窗
+      showLostModal: false, lostReason: "", lostDetail: "",
+      saving: false }),
     template: `
     <div class="fixed inset-0 z-40" @click.self="$emit('close')">
       <div class="absolute inset-0 bg-black/30"></div>
@@ -313,7 +349,7 @@
 
           <!-- 操作 -->
           <div class="flex flex-wrap gap-2">
-            <select @change="moveStage($event.target.value)" :value="lead.status" class="border rounded-lg px-2 py-1.5 text-sm">
+            <select @change="onStageChange($event.target.value)" :value="lead.status" class="border rounded-lg px-2 py-1.5 text-sm">
               <option v-for="(label,s) in ctx.shared.LEAD_STATUS_LABEL" :value="s" :disabled="s==='converted'||s==='lost'">{{ label }}</option>
             </select>
             <select v-if="ctx.shared.isOwner" @change="assignTo($event.target.value)" :value="lead.assigned_advisor_id||''" class="border rounded-lg px-2 py-1.5 text-sm">
@@ -322,6 +358,25 @@
             </select>
             <button v-if="lead.status!=='converted'" @click="convert" class="bg-emerald-600 text-white rounded-lg px-3 py-1.5 text-sm">转化为学生</button>
             <span v-else class="text-emerald-600 text-sm py-1.5">✓ 已转化</span>
+          </div>
+
+          <!-- Phase 5: 流失原因弹窗 -->
+          <div v-if="showLostModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" @click.self="showLostModal=false">
+            <div class="bg-white rounded-2xl w-full max-w-sm p-6">
+              <h3 class="font-bold mb-1">标记为流失</h3>
+              <div class="text-sm text-slate-500 mb-4">请填写流失原因（必填）+ 备注（≥10 字）</div>
+              <div class="space-y-3 text-sm">
+                <select v-model="lostReason" class="w-full border rounded-lg px-3 py-2">
+                  <option value="">选流失原因</option>
+                  <option v-for="(label, r) in ctx.shared.LOST_REASON_LABEL" :value="r">{{ label }}</option>
+                </select>
+                <textarea v-model="lostDetail" placeholder="详细原因（≥10 字）" class="w-full border rounded-lg px-3 py-2" rows="3"></textarea>
+              </div>
+              <div class="flex gap-2 mt-4">
+                <button @click="showLostModal=false" class="flex-1 border rounded-lg py-2 text-sm">取消</button>
+                <button @click="confirmLost" class="flex-1 bg-red-600 text-white rounded-lg py-2 text-sm">确认流失</button>
+              </div>
+            </div>
           </div>
 
           <!-- 跟进记录 -->
@@ -358,9 +413,25 @@
           this.lead = d.lead; this.activities = d.activities;
         } catch (e) { this.ctx.toast(e.message, "error"); }
       },
+      onStageChange(status) {
+        // 流失走弹窗（必填原因）
+        if (status === "lost") { this.showLostModal = true; this.lostReason = ""; this.lostDetail = ""; return; }
+        this.moveStage(status);
+      },
       async moveStage(status) {
         try { await S().post(`/api/leads/${this.leadId}/move-stage`, { status }); this.load(); this.$emit("changed"); }
         catch (e) { this.ctx.toast(e.message, "error"); }
+      },
+      async confirmLost() {
+        if (!this.lostReason) { this.ctx.toast("请选流失原因", "error"); return; }
+        if (!this.lostDetail || this.lostDetail.trim().length < 10) { this.ctx.toast("备注至少 10 字", "error"); return; }
+        try {
+          await S().post(`/api/leads/${this.leadId}/move-stage`, {
+            status: "lost", lost_reason: this.lostReason, lost_detail: this.lostDetail
+          });
+          this.ctx.toast("已标记流失"); this.showLostModal = false;
+          this.load(); this.$emit("changed");
+        } catch (e) { this.ctx.toast(e.message, "error"); }
       },
       async assignTo(advisor_id) {
         if (!advisor_id) return;
@@ -430,6 +501,11 @@
     data: () => ({
       stu: null, assignments: [], contracts: [], tasks: [], milestones: [], apps: [],
       advisors: [], tab: "overview",
+      deliverables: [],  // Phase 5
+      deliverableModal: null,  // {deliverable_id, title}
+      newVersion: { content: "", submit: false },
+      reviewModal: null,  // {version_id}
+      review: { decision: "approve", content: "" },
       assignForm: { advisor_member_id: "", phase: "overall" },
       handoverTarget: null, handover: { new_advisor_id: "", handover_note: "" },
     }),
@@ -515,6 +591,90 @@
               </div>
             </card>
           </div>
+
+          <!-- Phase 5: 交付物 -->
+          <div v-show="tab==='deliverables'">
+            <card title="交付物（多版本）">
+              <empty v-if="!deliverables.length" text="暂无交付物"></empty>
+              <div v-for="d in deliverables" :key="d.id" class="py-2.5 border-b border-slate-100 last:border-0">
+                <div class="flex justify-between items-center">
+                  <div>
+                    <div class="font-medium text-sm">{{ d.title }}</div>
+                    <div class="text-xs text-slate-400">{{ d.advisor_name }} · {{ d.module_code || '' }}</div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <tag :label="({draft:'草稿',in_review:'审阅中',accepted:'已通过'})[d.status]||d.status"
+                          :color="({draft:'slate',in_review:'amber',accepted:'green'})[d.status]||'slate'"></tag>
+                    <button @click="openDeliverableDetail(d)" class="text-xs text-blue-600">版本</button>
+                  </div>
+                </div>
+              </div>
+            </card>
+          </div>
+
+          <!-- Phase 5: 交付物版本/审阅弹窗 -->
+          <div v-if="deliverableModal" class="absolute inset-0 bg-black/40 flex items-center justify-center p-4 z-50" @click.self="deliverableModal=null">
+            <div class="bg-white rounded-2xl w-full max-w-2xl p-6 max-h-[85vh] overflow-y-auto">
+              <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold">{{ deliverableModal.title }}</h3>
+                <button @click="deliverableModal=null" class="text-slate-400 text-xl">✕</button>
+              </div>
+              <div v-if="deliverableModal.loading" class="text-sm text-slate-400">加载中…</div>
+              <template v-else-if="deliverableModal.data">
+                <div v-for="v in deliverableModal.data.versions" :key="v.id" class="border rounded-lg p-3 mb-3">
+                  <div class="flex justify-between items-center mb-2">
+                    <div class="font-medium">v{{ v.version }} <span class="text-xs text-slate-400">{{ v.submitted_by_name }}</span></div>
+                    <div class="flex gap-1">
+                      <tag :label="({draft:'草稿',in_review:'审阅中',accepted:'已通过'})[v.status]||v.status" color="slate"></tag>
+                    </div>
+                  </div>
+                  <div class="text-sm text-slate-600 whitespace-pre-wrap bg-slate-50 rounded p-2 mb-2">{{ v.content || '(无内容)' }}</div>
+                  <!-- 审阅意见 -->
+                  <div v-if="v.comments && v.comments.length" class="border-t pt-2 mt-2 space-y-1">
+                    <div v-for="c in v.comments" :key="c.id" class="text-xs flex gap-2">
+                      <span :class="c.decision==='approve'?'text-emerald-600':(c.decision==='reject'?'text-red-600':'text-slate-500')">
+                        {{ ({approve:'✓ 通过',reject:'✗ 驳回',comment:'💬 评论'})[c.decision] }}
+                      </span>
+                      <span class="text-slate-400">{{ c.reviewer_name }}:</span>
+                      <span class="text-slate-600">{{ c.content }}</span>
+                    </div>
+                  </div>
+                  <!-- 审阅操作（仅 in_review 状态且当前用户是 owner/advisor）-->
+                  <div v-if="v.status==='in_review' && ctx.shared.isStaff" class="flex gap-2 mt-2 pt-2 border-t">
+                    <button @click="openReview(v)" class="text-xs bg-emerald-50 text-emerald-600 rounded px-2 py-1">审阅</button>
+                  </div>
+                </div>
+                <!-- 出新版本（草稿） -->
+                <div v-if="ctx.shared.isStaff" class="border-t pt-3 mt-3">
+                  <div class="text-sm font-semibold mb-2">出新版本</div>
+                  <textarea v-model="newVersion.content" placeholder="新版本内容/说明" class="w-full border rounded-lg px-3 py-2 text-sm" rows="2"></textarea>
+                  <div class="flex items-center gap-2 mt-2">
+                    <label class="text-sm"><input type="checkbox" v-model="newVersion.submit" /> 提交审阅</label>
+                    <button @click="submitNewVersion" class="ml-auto bg-blue-600 text-white rounded-lg px-4 py-1.5 text-sm">提交 v{{ (deliverableModal.data.versions.length||0)+1 }}</button>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Phase 5: 审阅弹窗 -->
+          <div v-if="reviewModal" class="absolute inset-0 bg-black/50 flex items-center justify-center p-4 z-50" @click.self="reviewModal=null">
+            <div class="bg-white rounded-2xl w-full max-w-sm p-6">
+              <h3 class="font-bold mb-3">审阅 v{{ reviewModal.version }}</h3>
+              <div class="space-y-3 text-sm">
+                <div class="flex gap-2">
+                  <label><input type="radio" v-model="review.decision" value="approve" /> 通过</label>
+                  <label><input type="radio" v-model="review.decision" value="reject" /> 驳回</label>
+                  <label><input type="radio" v-model="review.decision" value="comment" /> 评论</label>
+                </div>
+                <textarea v-model="review.content" placeholder="审阅意见（必填）" class="w-full border rounded-lg px-3 py-2" rows="3"></textarea>
+              </div>
+              <div class="flex gap-2 mt-4">
+                <button @click="reviewModal=null" class="flex-1 border rounded-lg py-2 text-sm">取消</button>
+                <button @click="submitReview" class="flex-1 bg-emerald-600 text-white rounded-lg py-2 text-sm">提交审阅</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- 换师弹窗 -->
@@ -541,6 +701,7 @@
           { id: "overview", label: "总览" },
           { id: "progress", label: "服务进程" },
           { id: "applications", label: "申请" },
+          { id: "deliverables", label: "交付物" },  // Phase 5
         ];
       },
     },
@@ -549,16 +710,18 @@
       async loadAll() {
         try {
           this.stu = await S().get("/api/students/" + this.studentId);
-          const [a, c, t, m, ap] = await Promise.all([
+          const [a, c, t, m, ap, dv] = await Promise.all([
             S().get("/api/assignments?student_id=" + this.studentId),
             S().get("/api/contracts?student_id=" + this.studentId),
             S().get("/api/workflow/tasks?student_id=" + this.studentId),
             S().get("/api/workflow/milestones?student_id=" + this.studentId),
             S().get("/api/workflow/applications?student_id=" + this.studentId),
+            S().get("/api/assignments/deliverables?student_id=" + this.studentId),  // Phase 5
           ]);
           this.assignments = a.items.filter(x => x.status === "active");
           this.contracts = c.items;
           this.tasks = t.items; this.milestones = m.items; this.apps = ap.items;
+          this.deliverables = dv.items;  // Phase 5
           if (this.ctx.shared.isStaff) {
             const st = await S().get("/api/staff").catch(() => ({ items: [] }));
             this.advisors = st.items.filter(x => x.role === "advisor");
@@ -586,6 +749,40 @@
       async toggleMilestone(m) {
         try { await S().post(`/api/workflow/milestones/${m.id}/status`, { status: m.status === "done" ? "pending" : "done" }); this.loadAll(); }
         catch (e) { this.ctx.toast(e.message, "error"); }
+      },
+      // Phase 5: 交付物多版本
+      async openDeliverableDetail(d) {
+        this.deliverableModal = { deliverable_id: d.id, title: d.title, loading: true, data: null };
+        try {
+          const r = await S().get("/api/assignments/deliverables/" + d.id);
+          this.deliverableModal.data = r;
+        } catch (e) { this.ctx.toast(e.message, "error"); }
+        this.deliverableModal.loading = false;
+      },
+      async submitNewVersion() {
+        if (!this.newVersion.content.trim()) { this.ctx.toast("请填内容", "error"); return; }
+        try {
+          await S().post(`/api/assignments/deliverables/${this.deliverableModal.deliverable_id}/versions`,
+                         { content: this.newVersion.content, submit: this.newVersion.submit });
+          this.ctx.toast("已出新版本");
+          this.newVersion = { content: "", submit: false };
+          this.openDeliverableDetail(this.deliverableModal);
+          this.loadAll();
+        } catch (e) { this.ctx.toast(e.message, "error"); }
+      },
+      openReview(v) {
+        this.reviewModal = { version_id: v.id, version: v.version };
+        this.review = { decision: "approve", content: "" };
+      },
+      async submitReview() {
+        if (!this.review.content.trim()) { this.ctx.toast("请填审阅意见", "error"); return; }
+        try {
+          await S().post(`/api/assignments/deliverables/versions/${this.reviewModal.version_id}/review`,
+                         { decision: this.review.decision, content: this.review.content });
+          this.ctx.toast("审阅已提交"); this.reviewModal = null;
+          this.openDeliverableDetail(this.deliverableModal);
+          this.loadAll();
+        } catch (e) { this.ctx.toast(e.message, "error"); }
       },
     },
   });
@@ -904,10 +1101,82 @@
     },
   });
 
+  // Phase 5: 撞单工作台（owner）
+  const CollisionsView = defineComponent({
+    components: { Card, Tag, Empty },
+    props: ["ctx"],
+    data: () => ({ groups: [], loading: true, merging: null, mergeNote: "" }),
+    template: `
+    <div>
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-xl font-bold">撞单工作台</h1>
+        <div class="text-sm text-slate-400">同一手机号/微信的多条线索</div>
+      </div>
+      <empty v-if="!loading && !groups.length" text="暂无撞单"></empty>
+      <div v-if="loading" class="text-sm text-slate-400">加载中…</div>
+      <div v-for="g in groups" :key="g.key" class="bg-white rounded-xl border border-slate-200 p-5 mb-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="font-medium">📱 {{ g.key }}</div>
+          <span class="text-xs text-slate-400">{{ g.leads.length }} 条重复</span>
+        </div>
+        <table class="w-full text-sm mb-3">
+          <thead><tr class="text-left text-slate-400 text-xs border-b border-slate-100">
+            <th class="py-2">学生</th><th>来源</th><th>归属顾问</th><th>状态</th><th>录入时间</th>
+          </tr></thead>
+          <tbody>
+            <tr v-for="l in g.leads" :key="l.lead_id" class="border-b border-slate-50">
+              <td class="py-2 font-medium">{{ l.student_name }}</td>
+              <td class="text-slate-500 text-xs">{{ l.source || '—' }}</td>
+              <td class="text-slate-500">{{ l.assigned_advisor_id || '未分配' }}</td>
+              <td><tag :label="ctx.shared.LEAD_STATUS_LABEL[l.status]||l.status" color="blue"></tag></td>
+              <td class="text-slate-400 text-xs">{{ ctx.shared.fmtDate(l.created_at) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="flex items-center gap-2">
+          <select v-model="g._keep" class="border rounded-lg px-2 py-1.5 text-sm flex-1">
+            <option value="">保留哪条？</option>
+            <option v-for="l in g.leads" :value="l.lead_id">保留 {{ l.student_name }} ({{ l.source }} · {{ ctx.shared.fmtDate(l.created_at) }})</option>
+          </select>
+          <input v-model="g._note" placeholder="合并原因（必填）" class="border rounded-lg px-3 py-1.5 text-sm flex-1" />
+          <button @click="doMerge(g)" :disabled="merging===g.key" class="bg-amber-600 text-white rounded-lg px-4 py-1.5 text-sm disabled:opacity-50">
+            {{ merging===g.key ? '合并中…' : '合并' }}
+          </button>
+        </div>
+      </div>
+    </div>`,
+    async mounted() { this.load(); },
+    methods: {
+      async load() {
+        try {
+          const d = await S().get("/api/leads/collisions");
+          this.groups = d.groups.map(g => ({...g, _keep: "", _note: ""}));
+        } catch (e) { this.ctx.toast(e.message, "error"); }
+        this.loading = false;
+      },
+      async doMerge(g) {
+        if (!g._keep || !g._note) { this.ctx.toast("请选保留线索 + 填合并原因", "error"); return; }
+        const others = g.leads.filter(l => l.lead_id !== g._keep).map(l => l.lead_id);
+        if (!others.length) { this.ctx.toast("无需合并", "error"); return; }
+        this.merging = g.key;
+        try {
+          await S().post("/api/leads/merge", {
+            keep_lead_id: g._keep,
+            merge_lead_ids: others,
+            reason: g._note
+          });
+          this.ctx.toast("合并完成");
+          this.load();
+        } catch (e) { this.ctx.toast(e.message, "error"); }
+        this.merging = null;
+      },
+    },
+  });
+
   const ReportsView = defineComponent({
     components: { Card, Empty },
     props: ["ctx"],
-    data: () => ({ funnel: {} }),
+    data: () => ({ funnel: {}, roi: [], loss: {} }),
     template: `
     <div>
       <h1 class="text-xl font-bold mb-4">报表</h1>
@@ -921,14 +1190,49 @@
           <div class="w-10 text-right text-sm font-medium">{{ funnel.by_status[s]||0 }}</div>
         </div>
       </card>
-      <card title="线索来源" class="mt-4">
-        <empty v-if="!Object.keys(funnel.by_source||{}).length"></empty>
-        <div class="flex flex-wrap gap-2">
-          <div v-for="(c, src) in funnel.by_source" :key="src" class="bg-slate-50 border rounded-lg px-3 py-2 text-sm">{{ src }} <b>{{ c }}</b></div>
+
+      <!-- Phase 5: 流失原因 -->
+      <card title="流失原因分布" class="mt-4">
+        <empty v-if="!(loss.by_reason||[]).length" text="暂无流失"></empty>
+        <div v-for="r in loss.by_reason||[]" :key="r.reason" class="flex items-center gap-3 py-1.5">
+          <div class="w-32 text-sm text-slate-500">{{ ctx.shared.LOST_REASON_LABEL[r.reason]||r.reason }}</div>
+          <div class="flex-1 bg-slate-100 rounded-full h-5 overflow-hidden">
+            <div class="bg-red-400 h-full rounded-full" :style="{width: r.pct+'%'}"></div>
+          </div>
+          <div class="w-16 text-right text-sm font-medium">{{ r.count }} <span class="text-xs text-slate-400">({{ r.pct }}%)</span></div>
         </div>
       </card>
+
+      <!-- Phase 5: 来源 ROI -->
+      <card title="来源 ROI" class="mt-4">
+        <empty v-if="!roi.length" text="暂无数据"></empty>
+        <table v-else class="w-full text-sm">
+          <thead><tr class="text-left text-slate-400 text-xs border-b border-slate-100">
+            <th class="py-2">来源</th><th>线索</th><th>转化</th><th>转化率</th><th>签约额</th><th>CPA</th><th>ROI</th>
+          </tr></thead>
+          <tbody>
+            <tr v-for="r in roi" :key="r.source" class="border-b border-slate-50">
+              <td class="py-2 font-medium">{{ r.source }}</td>
+              <td>{{ r.leads }}</td>
+              <td>{{ r.converted }}</td>
+              <td :class="r.conv_rate>=30?'text-emerald-600':'text-slate-500'">{{ r.conv_rate }}%</td>
+              <td>{{ ctx.shared.fmtMoney(r.revenue_cents/100) }}</td>
+              <td>{{ r.cpa_cents===0?'—':ctx.shared.fmtMoney(r.cpa_cents/100) }}</td>
+              <td :class="r.roi==='∞'?'text-blue-600':'text-slate-700'">{{ r.roi }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </card>
     </div>`,
-    async mounted() { try { this.funnel = await S().get("/api/leads/stats/funnel"); } catch (e) { this.ctx.toast(e.message, "error"); } },
+    async mounted() {
+      try {
+        this.funnel = await S().get("/api/leads/stats/funnel");
+        if (this.ctx.shared.isOwner) {
+          this.roi = (await S().get("/api/reports/source-roi")).items;
+          this.loss = await S().get("/api/reports/loss-reasons");
+        }
+      } catch (e) { this.ctx.toast(e.message, "error"); }
+    },
     methods: {
       pct(n) { const total = Object.values(this.funnel.by_status || {}).reduce((a, b) => a + b, 0); return total ? Math.round((n || 0) / total * 100) : 0; },
     },
@@ -1002,8 +1306,14 @@
     async mounted() {
       try {
         const me = S().getUser();
-        this.stu = await S().get("/api/students/" + me.member_id).catch(() => null);
-        const [t, m] = await Promise.all([S().get("/api/workflow/tasks"), S().get("/api/workflow/milestones")]);
+        // Phase 5: 家长端带 activeStudentId
+        const sid = this.ctx.activeStudentId || me.member_id;
+        this.stu = await S().get("/api/students/" + sid).catch(() => null);
+        const q = sid !== me.member_id ? "?student_id=" + sid : "";
+        const [t, m] = await Promise.all([
+          S().get("/api/workflow/tasks" + q),
+          S().get("/api/workflow/milestones" + q)
+        ]);
         this.tasks = t.items; this.milestones = m.items;
       } catch (e) { this.ctx.toast(e.message, "error"); }
       this.loading = false;
@@ -1033,7 +1343,14 @@
     </div>`,
     async mounted() { this.load(); },
     methods: {
-      async load() { try { const d = await S().get("/api/workflow/tasks"); this.tasks = d.items; } catch (e) { this.ctx.toast(e.message, "error"); } this.loading = false; },
+      async load() {
+        try {
+          const q = this.ctx.activeStudentId ? "?student_id=" + this.ctx.activeStudentId : "";
+          const d = await S().get("/api/workflow/tasks" + q);
+          this.tasks = d.items;
+        } catch (e) { this.ctx.toast(e.message, "error"); }
+        this.loading = false;
+      },
       async toggle(t) {
         try { await S().post(`/api/workflow/tasks/${t.id}/status`, { status: t.status === "done" ? "pending" : "done" }); this.load(); }
         catch (e) { this.ctx.toast(e.message, "error"); }
@@ -1064,7 +1381,9 @@
     async mounted() {
       try {
         const me = S().getUser();
-        const d = await S().get("/api/contracts?student_id=" + me.member_id);
+        // Phase 5: 家长带 activeStudentId
+        const sid = this.ctx.activeStudentId || me.member_id;
+        const d = await S().get("/api/contracts?student_id=" + sid);
         this.items = d.items;
         const m = await S().get("/api/contracts/modules").catch(() => ({ modules: [] }));
         this._mods = Object.fromEntries(m.modules.map(x => [x.code, x.name_zh]));
@@ -1165,7 +1484,7 @@
   // 注册到全局
   window.SohoViews = {
     LoginView, DashboardView, LeadsView, LeadDetail, StudentsView, StudentDetail,
-    ContractsView, StaffView, ReportsView, SettingsView,
+    ContractsView, StaffView, CollisionsView, ReportsView, SettingsView,
     MyProgressView, MyTasksView, MyContractView, MessagesView, NotificationsView,
   };
 })();

@@ -55,7 +55,8 @@ window.SohoShared = (function () {
   function fmtDate(s) { if (!s) return "—"; return String(s).slice(0, 10); }
   function fmtMoney(n) { if (n == null) return "—"; return "¥" + Number(n).toLocaleString(); }
   const PHASE_LABEL = { overall: "全程", exam: "考试", writing: "文书", school: "选校", interview: "面试", visa: "签证", other: "其他" };
-  const LEAD_STATUS_LABEL = { new: "新线索", contacted: "已联系", qualified: "意向确认", proposal: "方案报价", negotiation: "签约谈判", converted: "已签约", lost: "已流失" };
+  const LEAD_STATUS_LABEL = { new: "新线索", contacted: "已联系", qualified: "意向确认", proposal: "方案报价", negotiation: "签约谈判", converted: "已签约", lost: "已流失", recycled: "公海" };
+  const LOST_REASON_LABEL = { price_too_high: "价格过高", chose_competitor: "选了竞品", decided_not_to_apply: "放弃申请", lost_contact: "联系不上", other: "其他" };
   const APP_STATUS_LABEL = { preparing: "准备中", submitted: "已递交", under_review: "审核中", interview: "面试", offer: "录取", rejection: "拒录", waitlist: "候补" };
   const CONTRACT_STATUS_LABEL = { active: "履约中", completed: "已完成", terminated: "已终止" };
 
@@ -63,6 +64,6 @@ window.SohoShared = (function () {
     getToken, getUser, setAuth, clearAuth,
     api, get, post, put,
     isOwner, isStaff, isStudentSide,
-    fmtDate, fmtMoney, PHASE_LABEL, LEAD_STATUS_LABEL, APP_STATUS_LABEL, CONTRACT_STATUS_LABEL,
+    fmtDate, fmtMoney, PHASE_LABEL, LEAD_STATUS_LABEL, LOST_REASON_LABEL, APP_STATUS_LABEL, CONTRACT_STATUS_LABEL,
   };
 })();

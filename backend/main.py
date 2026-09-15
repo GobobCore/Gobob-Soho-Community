@@ -86,8 +86,12 @@ def startup():
         log.warning("bootstrap 跳过（表可能未建，先跑 schema.sql）: %s", e)
 
 
-# ── 路由挂载（Phase 1 逐步启用）──
-from api import auth_router, assessment  # noqa: E402
+# ── 路由挂载 ──
+from api import (  # noqa: E402
+    assessment, auth_router, assignments, contracts, dashboard,
+    leads, messages, staff, students, templates, workflow,
+)
 
-app.include_router(auth_router.router)
-app.include_router(assessment.router)
+for _r in (auth_router, assessment, leads, contracts, assignments, students,
+           workflow, templates, staff, dashboard, messages):
+    app.include_router(_r.router)

@@ -9,15 +9,15 @@ members.role 存角色；accounts.is_admin 仅保留兼容（owner 即管理员�
 
 from datetime import datetime, timedelta
 
+import bcrypt
 from fastapi import Depends, Header, HTTPException
 from jose import jwt
-from passlib.context import CryptContext
 
 from .config import get_settings
 from .database import db_cursor
 
 settings = get_settings()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# 直接用 bcrypt 库（passlib 1.7.4 与 bcrypt 4.x+ 不兼容，会导致 hash 失败）
 
 # SOHO 四种角色
 ROLE_OWNER = "owner"      # 老板/主管：全量
@@ -30,11 +30,14 @@ STAFF_ROLES = {ROLE_OWNER, ROLE_ADVISOR}
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode("utf-8")[:72], bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8")[:72], hashed.encode("utf-8"))
+    except Exception:
+        return False
 
 
 def create_token(user_id: str, username: str, role: str, org_id: str, **extra) -> str:

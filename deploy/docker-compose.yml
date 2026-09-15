@@ -1,4 +1,4 @@
-name: gobob-soho
+version: "3.8"
 
 services:
   mysql:
@@ -46,13 +46,30 @@ services:
     volumes:
       - soho-files:/app/data
 
-  # 前端 portal / app 在 Phase 2/3 加入
-  # portal:
-  #   build: { context: .., dockerfile: deploy/Dockerfile.portal }
-  #   ports: ["${SOHO_PORTAL_PORT:-19002}:19002"]
-  # app:
-  #   build: { context: .., dockerfile: deploy/Dockerfile.app }
-  #   ports: ["${SOHO_APP_PORT:-19003}:19003"]
+  portal:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.portal
+      args:
+        SOHO_BACKEND_URL: http://backend:19001
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${SOHO_PORTAL_PORT:-19002}:19002"
+
+  app:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.app
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      SOHO_BACKEND: http://backend:19001
+      SOHO_APP_PORT: "19003"
+    ports:
+      - "${SOHO_APP_PORT:-19003}:19003"
 
 volumes:
   soho-mysql:

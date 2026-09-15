@@ -227,9 +227,8 @@ type Props = {
 };
 
 // R37 (2026-07-17): BFF_BASE_URL 使用相对路径 (让 Next.js proxy 路由)
-// 之前硬编码 127.0.0.1:18797, 用户从局域网访问时 127.0.0.1 指向自己机器
-// 现在用空字符串, 浏览器发到当前 host (例如 http://192.168.1.5:18800),
-// Next.js rewrite 把 /api/* 代理到后端
+// BFF_BASE_URL 用相对路径（空字符串），浏览器发到当前 host，由 Next.js rewrite 代理 /api/* 到后端
+// // Next.js rewrite 把 /api/* 代理到后端
 const BFF_BASE_URL =
   typeof process !== 'undefined' && process.env.PORTAL_BACKEND_URL
     ? process.env.PORTAL_BACKEND_URL
@@ -880,7 +879,7 @@ function Step2School({ form, update, meta }: { form: MultiStageFormData; update:
             value={form.gpa || ''}
             onChange={(e) => {
               // T1-X (2026-07-25 BUG-009 fix): 前端 GPA 范围校验 + 错误提示
-              // 之前 cecilia 报告 (2026-07-21): GPA 允许 -1, 999, "" 全部 accept
+              // 历史: GPA 允许 -1, 999, "" 全部 accept
               // 根因: min="0" 但 input 是 number type, 负数没拦 (e.g. -1), max 只看 gpa_scale 不看实际值
               // 修: onChange 校验数值范围 (0-4.3 4.0制, 0-5 5.0制, 0-100 百分制)
               // + 超过范围 clamp 到最近有效值 + inline 错误提示

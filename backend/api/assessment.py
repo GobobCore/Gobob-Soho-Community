@@ -57,7 +57,7 @@ def match(req: MatchReq, user: dict = Depends(auth.get_optional_user)):
                     user.get("org_id") or _default_org(),
                     req.lead_id,
                     user.get("member_id"),
-                    result.get("assessment_id"),
+                    result.get("assessment_id") or result.get("_assessment_session_id"),
                     json.dumps(req.form, ensure_ascii=False),
                     json.dumps(result, ensure_ascii=False),
                 ),

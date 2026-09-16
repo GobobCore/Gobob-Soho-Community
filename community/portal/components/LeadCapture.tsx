@@ -2,8 +2,12 @@
 
 /**
  * 留资钩子组件 — 评估后引导留联系方式 → 写入 SOHO leads（source=assessment）
+ *
+ * R-Feat 2026-09-16: SaaS 多机构支持 — 从 URL ?org=slug 拿机构标识
+ * 机构分享自己的专属链接 (portal.gobob.cn/?org=demo-studio) 后, 留资进对应机构
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 export default function LeadCapture({
   assessmentId,
@@ -16,6 +20,8 @@ export default function LeadCapture({
   onClose: () => void;
   onDone: () => void;
 }) {
+  const searchParams = useSearchParams();
+  const orgSlug = searchParams?.get('org') || '';
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [wechat, setWechat] = useState('');
@@ -27,7 +33,11 @@ export default function LeadCapture({
     if (!phone.trim() && !wechat.trim()) { setErr('请至少留一个联系方式（手机或微信）'); return; }
     setLoading(true); setErr('');
     try {
-      const res = await fetch('/api/leads/capture', {
+      // R-Feat 2026-09-16: SaaS 多机构 — 带 org=slug 参数
+      const url = orgSlug
+        ? `/api/leads/capture?org=${encodeURIComponent(orgSlug)}`
+        : '/api/leads/capture';
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

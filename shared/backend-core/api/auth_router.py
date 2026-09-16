@@ -72,6 +72,8 @@ def me(user: dict = Depends(auth.get_current_user)):
 
 class RegisterReq(BaseModel):
     org_name: str = Field(..., min_length=2, max_length=100, description="机构名 (例: 我的留学工作室)")
+    org_slug: str | None = Field(None, min_length=2, max_length=64, pattern=r"^[a-z0-9-]+$",
+                                  description="机构 slug (SaaS 多机构用, 例: demo-studio. 开源版可空)")
     username: str = Field(..., min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9_.-]+$", description="登录用户名")
     password: str = Field(..., min_length=8, max_length=64, description="密码 (≥8 位)")
     owner_name: str = Field(..., min_length=1, max_length=50, description="老板/主管姓名")
@@ -90,12 +92,17 @@ def register_org(req: RegisterReq):
         cur.execute("SELECT id FROM accounts WHERE username=%s LIMIT 1", (req.username,))
         if cur.fetchone():
             raise HTTPException(status_code=409, detail="用户名已被占用，请换一个")
+        # slug 唯一性 (SaaS 多机构用)
+        if req.org_slug:
+            cur.execute("SELECT id FROM orgs WHERE slug=%s LIMIT 1", (req.org_slug,))
+            if cur.fetchone():
+                raise HTTPException(status_code=409, detail=f"机构 slug '{req.org_slug}' 已被占用，请换一个")
         # 机构名宽松去重 (同名不阻止, 但会加备注, 机构名本身允许重名)
         # 创建
         org_id = new_id()
         cur.execute(
-            "INSERT INTO orgs (id, name, contact_phone, contact_email, contact_name) VALUES (%s, %s, %s, %s, %s)",
-            (org_id, req.org_name, req.contact_phone, req.contact_email, req.owner_name),
+            "INSERT INTO orgs (id, name, slug, contact_phone, contact_email, contact_name) VALUES (%s, %s, %s, %s, %s, %s)",
+            (org_id, req.org_name, req.org_slug, req.contact_phone, req.contact_email, req.owner_name),
         )
         acc_id = new_id()
         cur.execute(

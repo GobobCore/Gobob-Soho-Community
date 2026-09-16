@@ -8,7 +8,7 @@ import json
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from core import auth
@@ -150,14 +150,30 @@ def create_lead(req: LeadCreate, user: dict = Depends(auth.require_staff),
 
 # 获客门户匿名留资
 @router.post("/capture")
-def capture_lead(req: LeadCreate):
+def capture_lead(req: LeadCreate, request: Request = None):
+    """匿名留资. R-Feat 2026-09-16: 支持多机构 (SaaS 版) — 从 query 拿 org_slug 找机构.
+
+    调用方式:
+      - POST /api/leads/capture?org=demo-studio       (SaaS 版, 按 slug 找机构)
+      - POST /api/leads/capture                       (单机构版, 用第一个机构)
+      - POST /api/leads/capture (无 orgs)              (报错, 系统未初始化)
+    """
     lead_id = new_short_id("lead_")
+    org_slug = request.query_params.get("org") if request else None
     with db_cursor() as cur:
-        cur.execute("SELECT id FROM orgs ORDER BY created_at LIMIT 1")
-        org = cur.fetchone()
-        if not org:
-            raise HTTPException(503, "系统未初始化")
-        org_id = org["id"]
+        # 多机构 SaaS 版: 按 slug 找机构; 单机构版: 用第一个机构
+        if org_slug:
+            cur.execute("SELECT id FROM orgs WHERE slug=%s AND disabled=0 LIMIT 1", (org_slug,))
+            org = cur.fetchone()
+            if not org:
+                raise HTTPException(404, f"机构不存在或已停用: {org_slug}")
+            org_id = org["id"]
+        else:
+            cur.execute("SELECT id FROM orgs WHERE disabled=0 ORDER BY created_at LIMIT 1")
+            org = cur.fetchone()
+            if not org:
+                raise HTTPException(503, "系统未初始化")
+            org_id = org["id"]
         duplicates = _find_duplicates(org_id,
                                        student_phone=req.student_phone,
                                        student_wechat=req.student_wechat,

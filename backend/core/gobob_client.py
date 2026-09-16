@@ -29,7 +29,11 @@ def is_enabled() -> bool:
 
 
 def _headers() -> dict:
-    return {"X-API-Key": settings.gobob_api_key}
+    # X-Soho-Org-Id: Gobob 落 api_key_logs.org_id, 用于 SaaS 运营后台按机构聚合用量
+    h = {"X-API-Key": settings.gobob_api_key}
+    if settings.gobob_org_id:
+        h["X-Soho-Org-Id"] = settings.gobob_org_id
+    return h
 
 
 # ── 缓存 ─────────────────────────────────────────────────────────

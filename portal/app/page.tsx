@@ -87,20 +87,32 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="max-w-3xl mx-auto text-center pb-24 px-4">
-        <div className="relative overflow-hidden bg-gradient-to-br from-primary-50 via-white to-primary-100/50 rounded-3xl border border-primary-200/50 p-12 shadow-soft">
-          <div aria-hidden className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-primary-200/40 blur-2xl" />
-          <div className="relative">
-            <h2 className="text-3xl font-bold tracking-tight">开始你的留学规划</h2>
-            <p className="mt-3 text-slate-600">填写你的背景，30 秒出匹配结果</p>
-            <Link
-              href="/assessment"
-              className="btn-primary mt-7 text-base px-8 py-3.5"
-            >
-              免费智能评估
-              <ArrowRight className="w-5 h-5" />
-            </Link>
+      {/* CTA — 两种入口 */}
+      <section className="max-w-5xl mx-auto pb-24 px-4">
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* 学生入口 */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-primary-50 via-white to-primary-100/50 rounded-3xl border border-primary-200/50 p-10 shadow-soft">
+            <div aria-hidden className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-primary-200/40 blur-2xl" />
+            <div className="relative">
+              <h2 className="text-2xl font-bold tracking-tight">我是学生 / 家长</h2>
+              <p className="mt-2 text-slate-600 text-sm">先看看哪些学校适合我</p>
+              <Link href="/assessment" className="btn-primary mt-5 text-base px-6 py-3">
+                免费智能评估
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+            </div>
+          </div>
+          {/* 机构入口 */}
+          <div className="relative overflow-hidden bg-white rounded-3xl border border-slate-200 p-10 shadow-soft">
+            <div className="relative">
+              <h2 className="text-2xl font-bold tracking-tight">我是机构</h2>
+              <p className="mt-2 text-slate-600 text-sm">开通专属工作台，管线索、管学生、管签约</p>
+              <Link href="/register" className="mt-5 inline-flex items-center gap-2 text-primary-700 font-semibold border-2 border-primary-200 hover:border-primary-400 hover:bg-primary-50 px-6 py-3 rounded-xl transition-all text-base">
+                注册并开始 14 天免费试用
+                <ArrowRight className="w-5 h-5" />
+              </Link>
+              <p className="mt-3 text-xs text-slate-400">1-2 个协作账号免费，3 个及以上 ¥1000/账号/年</p>
+            </div>
           </div>
         </div>
       </section>

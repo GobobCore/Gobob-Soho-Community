@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     gobob_api_key: str = os.environ.get("GOBOB_API_KEY", "")
     # 本地缓存 TTL（秒），避免每次评估都打远程
     gobob_cache_ttl: int = int(os.environ.get("GOBOB_CACHE_TTL", "86400"))  # 24h
+    # 本机构 org_id — 调 Gobob 时通过 X-Soho-Org-Id 透传, Gobob 写到 api_key_logs
+    # SaaS 运营后台用量页按此聚合
+    gobob_org_id: str = os.environ.get("SOHO_ORG_ID", "")
 
     # ── 文件存储 ──
     storage_local_path: str = os.environ.get("SOHO_STORAGE_PATH", "./data/files")

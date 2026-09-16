@@ -70,12 +70,15 @@ def _bootstrap():
             "INSERT INTO members (id, account_id, org_id, name, role) VALUES (%s, %s, %s, %s, %s)",
             (new_id(), acc_id, org_id, settings.admin_username, auth.ROLE_OWNER),
         )
-        # 把默认 pipeline 阶段（org_id='default' 的种子）绑定到本机构
+        # 把默认 pipeline 阶段（org_id='default' 的种子）复制到本机构, 保留 default 不动
+        # (后续自助注册要从 default 复制, 不能 UPDATE 把 default 搬空)
         cur.execute(
-            "UPDATE lead_pipeline_stages SET org_id=%s WHERE org_id='default'",
+            "INSERT INTO lead_pipeline_stages (stage_id, org_id, name, sort_order, is_start, is_won, is_lost, max_days) "
+            "SELECT stage_id, %s, name, sort_order, is_start, is_won, is_lost, max_days "
+            "FROM lead_pipeline_stages WHERE org_id='default'",
             (org_id,),
         )
-        log.info("初始化完成：机构 '%s' + 管理员 '%s'", settings.org_name, settings.admin_username)
+        log.info("初始化完成：机构 '%s' + 管理员 '%s' + pipeline 阶段 %d", settings.org_name, settings.admin_username, cur.rowcount)
 
 
 @app.on_event("startup")

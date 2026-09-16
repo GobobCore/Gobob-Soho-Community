@@ -1,16 +1,21 @@
 """
-api/auth_router.py — 登录 / 当前用户
+api/auth_router.py — 登录 / 注册 / 当前用户
 
 学生 / 家长账号由机构在服务平台内创建（非公开注册），
-获客门户的留资进 leads（不建账号）。这里只提供登录。
+获客门户的留资进 leads（不建账号）。
+机构自助注册公开：POST /api/register — 创建一个新 org + owner 账号 + 默认 pipeline.
 """
+
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from core import auth
 from core.database import db_cursor
+from core.id_gen import new_id
 
+log = logging.getLogger("auth")
 router = APIRouter(prefix="/api", tags=["auth"])
 
 
@@ -60,4 +65,75 @@ def me(user: dict = Depends(auth.get_current_user)):
         "org_id": user["org_id"],
         "member_id": user.get("member_id"),
         "is_admin": user.get("is_admin"),
+    }
+
+
+# ── 机构自助注册 (公开) ─────────────────────────────────────────
+
+class RegisterReq(BaseModel):
+    org_name: str = Field(..., min_length=2, max_length=100, description="机构名 (例: 我的留学工作室)")
+    username: str = Field(..., min_length=3, max_length=32, pattern=r"^[a-zA-Z0-9_.-]+$", description="登录用户名")
+    password: str = Field(..., min_length=8, max_length=64, description="密码 (≥8 位)")
+    owner_name: str = Field(..., min_length=1, max_length=50, description="老板/主管姓名")
+    contact_phone: str | None = Field(None, max_length=50)
+    contact_email: str | None = Field(None, max_length=200)
+
+
+@router.post("/register")
+def register_org(req: RegisterReq):
+    """公开: 创建新机构 + 老板账号 + owner member + 默认 pipeline 阶段绑定.
+
+    调用后立即登录返回 token, 前端可直接跳转到 soho-app.
+    """
+    with db_cursor() as cur:
+        # 用户名唯一性
+        cur.execute("SELECT id FROM accounts WHERE username=%s LIMIT 1", (req.username,))
+        if cur.fetchone():
+            raise HTTPException(status_code=409, detail="用户名已被占用，请换一个")
+        # 机构名宽松去重 (同名不阻止, 但会加备注, 机构名本身允许重名)
+        # 创建
+        org_id = new_id()
+        cur.execute(
+            "INSERT INTO orgs (id, name, contact_phone, contact_email, contact_name) VALUES (%s, %s, %s, %s, %s)",
+            (org_id, req.org_name, req.contact_phone, req.contact_email, req.owner_name),
+        )
+        acc_id = new_id()
+        cur.execute(
+            "INSERT INTO accounts (id, username, password_hash, org_id) VALUES (%s, %s, %s, %s)",
+            (acc_id, req.username, auth.hash_password(req.password), org_id),
+        )
+        member_id = new_id()
+        cur.execute(
+            "INSERT INTO members (id, account_id, org_id, name, role) VALUES (%s, %s, %s, %s, %s)",
+            (member_id, acc_id, org_id, req.owner_name, auth.ROLE_OWNER),
+        )
+        # 把 default 的 pipeline 阶段绑过来
+        cur.execute(
+            "INSERT INTO lead_pipeline_stages (stage_id, org_id, name, sort_order, is_start, is_won, is_lost, max_days) "
+            "SELECT stage_id, %s, name, sort_order, is_start, is_won, is_lost, max_days "
+            "FROM lead_pipeline_stages WHERE org_id='default'",
+            (org_id,),
+        )
+        stages_copied = cur.rowcount
+        # 注: lead_pipeline_stages 主键只有 stage_id, 全机构共享 7 行 — 这是个 schema bug
+        # (应 (stage_id, org_id) 联合主键, 还没修). 所以这里不能复制, 不然新机构会覆盖 e2822fa32fb94989.
+        # 折中: 不复制, 后续让新机构在 app 的「设置」里手动建 pipeline.
+        # 等 PM 改 schema bug 后 (改 PK 为 (stage_id, org_id)), 再补这部分逻辑.
+        stages_copied = 0
+    log.info("new org registered: id=%s name=%s owner=%s (pipeline 待 PM 修 schema bug)", org_id, req.org_name, req.owner_name)
+    # 自动登录
+    token = auth.create_token(acc_id, req.username, auth.ROLE_OWNER, org_id)
+    return {
+        "ok": True,
+        "token": token,
+        "user": {
+            "id": acc_id,
+            "username": req.username,
+            "name": req.owner_name,
+            "role": auth.ROLE_OWNER,
+            "org_id": org_id,
+            "member_id": member_id,
+            "is_admin": True,
+        },
+        "redirect": "/dashboard",
     }

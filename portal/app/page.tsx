@@ -1,11 +1,15 @@
 import Link from 'next/link';
+import { Target, BarChart3, Users, ArrowRight } from 'lucide-react';
+
+// R-Design 2026-09-16 v2: emoji → lucide 扁平化单色图标
+// 统一 white on gradient 背景, 跟品牌色呼应
 
 export default function Home() {
   return (
     <div>
-      {/* Hero — R-Design 2026-09-16: 暖橙渐变 + 装饰光圈 + 更大字体层级 */}
+      {/* Hero — 暖橙渐变 + 装饰光圈 + 更大字体层级 */}
       <section className="relative overflow-hidden bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 text-white py-24 md:py-32 px-4">
-        {/* 装饰光圈 (暖橙 + 白 透明度) */}
+        {/* 装饰光圈 */}
         <div aria-hidden className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-white/10 blur-3xl" />
         <div aria-hidden className="absolute -bottom-40 -left-40 w-[28rem] h-[28rem] rounded-full bg-primary-300/30 blur-3xl" />
         <div aria-hidden className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] rounded-full bg-gradient-to-tr from-primary-400/20 to-transparent blur-3xl" />
@@ -33,7 +37,7 @@ export default function Home() {
             className="inline-flex items-center gap-2 mt-10 bg-white text-primary-700 font-bold px-8 py-4 rounded-2xl text-lg shadow-lift hover:shadow-[0_12px_32px_rgba(0,0,0,0.2)] hover:-translate-y-1 transition-all"
           >
             免费开始智能评估
-            <span aria-hidden className="text-xl">→</span>
+            <ArrowRight className="w-5 h-5" />
           </Link>
 
           <p className="mt-5 text-sm text-primary-100/80">
@@ -42,7 +46,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 卖点 — R-Design: 卡片 hover 浮起 + 图标包 gradient 背景 */}
+      {/* 卖点 — 扁平化单色图标 (lucide), 统一 white on 主色渐变 */}
       <section className="max-w-5xl mx-auto py-20 px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold tracking-tight">为什么选择 Gobob SOHO</h2>
@@ -50,25 +54,40 @@ export default function Home() {
         </div>
         <div className="grid md:grid-cols-3 gap-6">
           {[
-            { icon: '🎯', title: '精准匹配', desc: 'GPA / 语言 / 背景 / 预算 7 维加权，按冲刺-匹配-保底分层', color: 'from-orange-400 to-amber-500' },
-            { icon: '📊', title: '真实数据', desc: '院校库 + 历年录取数据校准，给出可信的录取概率', color: 'from-blue-400 to-indigo-500' },
-            { icon: '🤝', title: '顾问跟进', desc: '评估后可一键留资，专业顾问为你定制完整申请方案', color: 'from-emerald-400 to-teal-500' },
-          ].map((f) => (
-            <div
-              key={f.title}
-              className="group bg-white rounded-2xl border border-slate-200/70 p-8 text-center shadow-soft hover:shadow-lift hover:-translate-y-1 hover:border-primary-200 transition-all duration-300"
-            >
-              <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br ${f.color} text-white text-3xl shadow-md group-hover:scale-110 transition-transform`}>
-                {f.icon}
+            {
+              Icon: Target,
+              title: '精准匹配',
+              desc: 'GPA / 语言 / 背景 / 预算 7 维加权，按冲刺-匹配-保底分层',
+            },
+            {
+              Icon: BarChart3,
+              title: '真实数据',
+              desc: '院校库 + 历年录取数据校准，给出可信的录取概率',
+            },
+            {
+              Icon: Users,
+              title: '顾问跟进',
+              desc: '评估后可一键留资，专业顾问为你定制完整申请方案',
+            },
+          ].map((f) => {
+            const Icon = f.Icon;
+            return (
+              <div
+                key={f.title}
+                className="group bg-white rounded-2xl border border-slate-200/70 p-8 text-center shadow-soft hover:shadow-lift hover:-translate-y-1 hover:border-primary-200 transition-all duration-300"
+              >
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-md group-hover:scale-110 group-hover:shadow-glow-primary transition-all">
+                  <Icon className="w-8 h-8" strokeWidth={1.5} />
+                </div>
+                <h3 className="mt-5 font-bold text-xl tracking-tight">{f.title}</h3>
+                <p className="mt-2.5 text-sm text-slate-500 leading-relaxed">{f.desc}</p>
               </div>
-              <h3 className="mt-5 font-bold text-xl tracking-tight">{f.title}</h3>
-              <p className="mt-2.5 text-sm text-slate-500 leading-relaxed">{f.desc}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
-      {/* CTA — R-Design: 加渐变背景 + 装饰, 不再单调 */}
+      {/* CTA */}
       <section className="max-w-3xl mx-auto text-center pb-24 px-4">
         <div className="relative overflow-hidden bg-gradient-to-br from-primary-50 via-white to-primary-100/50 rounded-3xl border border-primary-200/50 p-12 shadow-soft">
           <div aria-hidden className="absolute -top-20 -right-20 w-48 h-48 rounded-full bg-primary-200/40 blur-2xl" />
@@ -80,7 +99,7 @@ export default function Home() {
               className="btn-primary mt-7 text-base px-8 py-3.5"
             >
               免费智能评估
-              <span aria-hidden>→</span>
+              <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
         </div>

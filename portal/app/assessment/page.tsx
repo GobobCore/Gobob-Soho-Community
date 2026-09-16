@@ -3,8 +3,11 @@
 /**
  * 获客门户 · 智能评估页
  * 匿名填表 → 调 SOHO backend /api/assessment/match（转发 Gobob）→ 分层结果 → 留资钩子
+ *
+ * R-Design 2026-09-16 v2: emoji → lucide 扁平化单色图标
  */
 import { useState } from 'react';
+import { Sparkles, Lock, Target, Gift, Check, ArrowRight, AlertTriangle } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
 import { Card } from '@/components/ui/Card';
 import { SchoolCard } from '@/components/ui/SchoolCard';
@@ -87,10 +90,10 @@ export default function AssessmentPage() {
 
   return (
     <Container className="py-10 md:py-14">
-      {/* R-Design 2026-09-16: 头部加视觉层级 — 渐变文字 + 副标题 + 隐私说明 */}
+      {/* 头部 — 渐变文字 + 副标题 + 隐私说明 */}
       <div className="text-center mb-10">
         <div className="inline-flex items-center gap-2 bg-primary-50 border border-primary-200 text-primary-700 rounded-full px-4 py-1.5 text-xs font-semibold mb-4">
-          <span aria-hidden>✨</span>
+          <Sparkles className="w-3.5 h-3.5" />
           免费 · 30 秒 · 无需注册
         </div>
         <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
@@ -101,8 +104,9 @@ export default function AssessmentPage() {
         <p className="mt-4 text-base md:text-lg text-slate-600 max-w-xl mx-auto">
           填写你的背景，匹配冲刺 / 稳妥 / 保底院校
         </p>
-        <p className="mt-2 text-xs text-slate-400">
-          🔒 你的信息只用于生成匹配结果，不会被分享
+        <p className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-400">
+          <Lock className="w-3 h-3" />
+          你的信息只用于生成匹配结果，不会被分享
         </p>
       </div>
 
@@ -111,8 +115,9 @@ export default function AssessmentPage() {
       </Card>
 
       {error && (
-        <div className="mt-6 mx-auto max-w-md bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-center text-red-700 text-sm">
-          ⚠️ {error}
+        <div className="mt-6 mx-auto max-w-md bg-red-50 border border-red-200 rounded-xl px-4 py-3 flex items-center justify-center gap-2 text-red-700 text-sm">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          {error}
         </div>
       )}
 
@@ -120,7 +125,7 @@ export default function AssessmentPage() {
         <div className="mt-16 animate-fade-in-up">
           <div className="text-center mb-8">
             <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-full px-4 py-1.5 text-xs font-semibold mb-4">
-              <span aria-hidden>🎯</span>
+              <Target className="w-3.5 h-3.5" />
               为你找到 {(tier?.reach?.length || 0) + (tier?.match?.length || 0) + (tier?.safety?.length || 0)} 所匹配院校
             </div>
             <h2 className="text-3xl font-bold tracking-tight">你的匹配结果</h2>
@@ -164,14 +169,14 @@ export default function AssessmentPage() {
             );
           })}
 
-          {/* 底部留资 CTA — R-Design: 暖橙渐变 + 装饰 */}
+          {/* 底部留资 CTA — 暖橙渐变 + 装饰 */}
           {!captured && (
             <div className="relative overflow-hidden mt-12 bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 rounded-3xl p-10 md:p-12 text-center text-white shadow-lift">
               <div aria-hidden className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white/10 blur-2xl" />
               <div aria-hidden className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-primary-300/30 blur-3xl" />
               <div className="relative">
-                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/20 backdrop-blur text-2xl mb-4">
-                  🎁
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/20 backdrop-blur mb-4">
+                  <Gift className="w-7 h-7" />
                 </div>
                 <h3 className="text-2xl md:text-3xl font-bold tracking-tight">想要完整申请方案？</h3>
                 <p className="mt-3 text-primary-50 max-w-md mx-auto">
@@ -182,7 +187,7 @@ export default function AssessmentPage() {
                   className="mt-7 inline-flex items-center gap-2 bg-white text-primary-700 font-bold px-8 py-4 rounded-2xl text-base shadow-lift hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition-all"
                 >
                   免费获取完整方案
-                  <span aria-hidden>→</span>
+                  <ArrowRight className="w-5 h-5" />
                 </button>
               </div>
             </div>
@@ -202,8 +207,8 @@ export default function AssessmentPage() {
 
       {captured && (
         <div className="mt-10 bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-8 text-center shadow-soft">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500 text-white text-2xl mb-3">
-            ✓
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500 text-white mb-3">
+            <Check className="w-7 h-7" strokeWidth={2.5} />
           </div>
           <p className="text-emerald-800 font-semibold text-lg">已收到你的信息</p>
           <p className="text-emerald-600 text-sm mt-1">顾问会尽快联系你</p>
@@ -212,4 +217,3 @@ export default function AssessmentPage() {
     </Container>
   );
 }
-// phase 5 cache bust 2026-09-16

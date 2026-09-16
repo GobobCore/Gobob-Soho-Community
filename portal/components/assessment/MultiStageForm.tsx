@@ -24,7 +24,7 @@ import { useState, useEffect } from 'react';
 import {
   GraduationCap, MapPin, BookOpen, Languages, Sparkles, Wallet,
   ChevronRight, ChevronLeft, CheckCircle2, AlertCircle, Loader2,
-  School, Award, Briefcase, Trophy, Heart, Palette, Globe,
+  School, Award, Briefcase, Trophy, Heart, Palette, Globe, Target,
 } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { SchoolPicker } from '@/components/ui/SchoolPicker';
@@ -896,8 +896,9 @@ function Step2School({ form, update, meta }: { form: MultiStageFormData; update:
       </Field>
 
       {form.current_school_tier && (
-        <div className="text-xs text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg">
-          ✅ 自动判定 tier: <strong>{form.current_school_tier}</strong>
+        <div className="text-xs text-emerald-700 bg-emerald-50 px-3 py-2 rounded-lg inline-flex items-center gap-1.5">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          自动判定 tier: <strong>{form.current_school_tier}</strong>
           {form.current_school_tier === '985' && ' (权重最高, 申请优势大)'}
           {form.current_school_tier === '211' && ' (良好)'}
           {form.current_school_tier === '双非' && ' (需重点突出软背景)'}
@@ -1161,7 +1162,10 @@ function Step4Language({ form, update, selectedCountries }: {
 
       {/* R32 智能提示: 根据学段×学位告诉用户该填什么 */}
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs">
-        <div className="font-semibold text-blue-800 mb-1">📋 你选的国家:</div>
+        <div className="font-semibold text-blue-800 mb-1 inline-flex items-center gap-1.5">
+          <BookOpen className="w-4 h-4" />
+          你选的国家:
+        </div>
         <ul className="space-y-0.5 text-blue-700 mb-2">
           {selectedCountries.map((c) => (
             <li key={c.id}>
@@ -1173,7 +1177,10 @@ function Step4Language({ form, update, selectedCountries }: {
         </ul>
         {examHints.length > 0 && (
           <div className="mt-2 pt-2 border-t border-blue-200">
-            <div className="font-semibold text-blue-800 mb-1">🎯 {STAGE_LABELS[stage]} + {deg} 推荐考:</div>
+            <div className="font-semibold text-blue-800 mb-1 inline-flex items-center gap-1.5">
+              <Target className="w-4 h-4" />
+              {STAGE_LABELS[stage]} + {deg} 推荐考:
+            </div>
             <ul className="space-y-0.5 text-blue-700">
               {examHints.map((h, i) => <li key={i}>• {h}</li>)}
             </ul>
@@ -1217,8 +1224,9 @@ function Step4Language({ form, update, selectedCountries }: {
           </div>
 
           {/* R46 (R42 P0-4): 英语小分 (G5 要求单项 ≥ 6.5/7.0) */}
-          <div className="p-2 bg-yellow-50 border border-yellow-100 rounded text-xs text-yellow-800">
-            ⚠️ G5 (牛剑/LSE/ICL) 要求小分: 雅思 ≥ 6.5 (单项), 托福 ≥ 22 (口语/写作)
+          <div className="p-2 bg-yellow-50 border border-yellow-100 rounded text-xs text-yellow-800 inline-flex items-start gap-1.5">
+            <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+            <span>G5 (牛剑/LSE/ICL) 要求小分: 雅思 ≥ 6.5 (单项), 托福 ≥ 22 (口语/写作)</span>
           </div>
           <div className="text-xs font-semibold text-gray-700 mt-1">英语小分 ({form.english_test || 'TOEFL'})</div>
           <div className="grid grid-cols-4 gap-2">
@@ -1471,13 +1479,16 @@ function Step5SoftBackground({ form, update }: { form: MultiStageFormData; updat
         软背景
       </h3>
 
-      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
-        💡 {STAGE_LABELS[form.current_stage]} + {form.target_degree || '?'} →
-        你的“高质量背景”是：
-        {stageGroup === 'high_school' && ' 竞赛名次 + 顶尖夏校 + 学科奥赛 + 社团领导力'}
-        {stageGroup === 'vocational' && ' 实习经历 + 技能证书 + 学业表现'}
-        {stageGroup === 'undergraduate' && ' 科研 + 论文 + 实习 + 竞赛 + 推荐信'}
-        {stageGroup === 'graduate' && ' 科研论文 + 会议 + 推荐人关系 + 研究方向匹配'}
+      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 flex items-start gap-1.5">
+        <Sparkles className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+        <span>
+          {STAGE_LABELS[form.current_stage]} + {form.target_degree || '?'} →
+          你的"高质量背景"是：
+          {stageGroup === 'high_school' && ' 竞赛名次 + 顶尖夏校 + 学科奥赛 + 社团领导力'}
+          {stageGroup === 'vocational' && ' 实习经历 + 技能证书 + 学业表现'}
+          {stageGroup === 'undergraduate' && ' 科研 + 论文 + 实习 + 竞赛 + 推荐信'}
+          {stageGroup === 'graduate' && ' 科研论文 + 会议 + 推荐人关系 + 研究方向匹配'}
+        </span>
       </div>
 
       {/* 科研 + 实习 (硕博 + 本科) */}
@@ -1535,7 +1546,7 @@ function Step5SoftBackground({ form, update }: { form: MultiStageFormData; updat
                   : 'border-gray-200 hover:border-gray-300 text-gray-700'
               }`}
             >
-              ✅ 已联系 (或面试过)
+              已联系 (或面试过)
             </button>
             <button
               type="button"
@@ -1560,16 +1571,16 @@ function Step5SoftBackground({ form, update }: { form: MultiStageFormData; updat
             <div className="flex gap-2">
               <button type="button" onClick={() => update('is_cross_disciplinary', true)}
                 className={`flex-1 px-3 py-2 text-sm rounded-lg border transition ${form.is_cross_disciplinary ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 hover:border-gray-300 text-gray-700'}`}>
-                ✅ 是 (跨专业申请)
+                是 (跨专业申请)
               </button>
               <button type="button" onClick={() => update('is_cross_disciplinary', false)}
                 className={`flex-1 px-3 py-2 text-sm rounded-lg border transition ${!form.is_cross_disciplinary ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 hover:border-gray-300 text-gray-700'}`}>
-                ❌ 否 (同/同类专业)
+                否 (同/同类专业)
               </button>
             </div>
             {form.is_cross_disciplinary && (
               <div className="mt-2 space-y-2 pl-2 border-l-2 border-amber-200">
-                <Field label="✅ 是否补修过先修课 (如算法/数据结构)">
+                <Field label="是否补修过先修课 (如算法/数据结构)">
                   <div className="flex gap-2">
                     <button type="button" onClick={() => update('prerequisite_completed', true)}
                       className={`flex-1 px-2 py-1 text-xs rounded border ${form.prerequisite_completed ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200'}`}>是</button>
@@ -1577,7 +1588,7 @@ function Step5SoftBackground({ form, update }: { form: MultiStageFormData; updat
                       className={`flex-1 px-2 py-1 text-xs rounded border ${!form.prerequisite_completed ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200'}`}>否</button>
                   </div>
                 </Field>
-                <Field label="🎓 是否有第二学位 (相关领域)">
+                <Field label="是否有第二学位 (相关领域)">
                   <div className="flex gap-2">
                     <button type="button" onClick={() => update('has_second_degree', true)}
                       className={`flex-1 px-2 py-1 text-xs rounded border ${form.has_second_degree ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200'}`}>有</button>
@@ -1881,7 +1892,10 @@ function Step6Budget({ form, update, selectedCountries }: {
 
       {/* R43 (2026-07-17): 预算推荐提示 (学费+生活费 分开显示) */}
       <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 space-y-1">
-        <div>💡 按你选的国家, <strong>学费</strong>推荐 <strong>{avgBudget} 万/年</strong> + <strong>生活费</strong> ~12-20 万/年 (城市差异大)</div>
+        <div className="flex items-start gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+          <span>按你选的国家, <strong>学费</strong>推荐 <strong>{avgBudget} 万/年</strong> + <strong>生活费</strong> ~12-20 万/年 (城市差异大)</span>
+        </div>
         <div>你填的实际预算: 学费 {form.budget_min}-{form.budget_max} + 生活费 {form.living_min || 0}-{form.living_max || 0} = 总 {(form.budget_min + (form.living_min || 0))}-{(form.budget_max + (form.living_max || 0))} 万/年</div>
       </div>
 

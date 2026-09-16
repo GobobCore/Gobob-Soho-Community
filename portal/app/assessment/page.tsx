@@ -86,24 +86,46 @@ export default function AssessmentPage() {
   const hasResult = tier && (tier.reach?.length || tier.match?.length || tier.safety?.length);
 
   return (
-    <Container className="py-10">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold">智能选校评估</h1>
-        <p className="mt-2 text-slate-500">填写你的背景，30 秒匹配冲刺 / 匹配 / 保底院校</p>
+    <Container className="py-10 md:py-14">
+      {/* R-Design 2026-09-16: 头部加视觉层级 — 渐变文字 + 副标题 + 隐私说明 */}
+      <div className="text-center mb-10">
+        <div className="inline-flex items-center gap-2 bg-primary-50 border border-primary-200 text-primary-700 rounded-full px-4 py-1.5 text-xs font-semibold mb-4">
+          <span aria-hidden>✨</span>
+          免费 · 30 秒 · 无需注册
+        </div>
+        <h1 className="text-3xl md:text-5xl font-bold tracking-tight">
+          <span className="bg-gradient-to-r from-primary-600 via-primary-500 to-primary-700 bg-clip-text text-transparent">
+            智能选校评估
+          </span>
+        </h1>
+        <p className="mt-4 text-base md:text-lg text-slate-600 max-w-xl mx-auto">
+          填写你的背景，匹配冲刺 / 稳妥 / 保底院校
+        </p>
+        <p className="mt-2 text-xs text-slate-400">
+          🔒 你的信息只用于生成匹配结果，不会被分享
+        </p>
       </div>
 
-      <Card>
+      <Card className="shadow-lift">
         <MultiStageForm onSubmit={handleSubmit} loading={loading} />
       </Card>
 
-      {error && <div className="mt-6 text-center text-red-500 text-sm">{error}</div>}
+      {error && (
+        <div className="mt-6 mx-auto max-w-md bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-center text-red-700 text-sm">
+          ⚠️ {error}
+        </div>
+      )}
 
       {hasResult && (
-        <div className="mt-12">
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold">你的匹配结果</h2>
+        <div className="mt-16 animate-fade-in-up">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-full px-4 py-1.5 text-xs font-semibold mb-4">
+              <span aria-hidden>🎯</span>
+              为你找到 {(tier?.reach?.length || 0) + (tier?.match?.length || 0) + (tier?.safety?.length || 0)} 所匹配院校
+            </div>
+            <h2 className="text-3xl font-bold tracking-tight">你的匹配结果</h2>
             {result?.tier_summary?.recommendation?.advice && (
-              <p className="mt-2 text-slate-500">{result.tier_summary.recommendation.advice}</p>
+              <p className="mt-3 text-slate-600 max-w-2xl mx-auto">{result.tier_summary.recommendation.advice}</p>
             )}
           </div>
 
@@ -111,12 +133,18 @@ export default function AssessmentPage() {
             const list = (tier?.[t.key] || []) as Match[];
             if (!list.length) return null;
             return (
-              <div key={t.key} className="mb-8">
-                <div className="flex items-baseline gap-3 mb-3">
-                  <h3 className={`text-lg font-bold ${t.color}`}>{t.label}（{list.length}）</h3>
+              <div key={t.key} className="mb-10">
+                <div className="flex items-baseline gap-3 mb-4">
+                  <h3 className={`text-xl font-bold ${t.color} flex items-center gap-2`}>
+                    <span className={`inline-block w-1.5 h-6 rounded-full ${
+                      t.key === 'reach' ? 'bg-orange-500' : t.key === 'match' ? 'bg-blue-500' : 'bg-emerald-500'
+                    }`} />
+                    {t.label}
+                    <span className="text-base font-semibold text-slate-500">（{list.length}）</span>
+                  </h3>
                   <span className="text-sm text-slate-400">{t.desc}</span>
                 </div>
-                <div className="grid md:grid-cols-2 gap-3">
+                <div className="grid md:grid-cols-2 gap-4">
                   {list.map((m) => (
                     <SchoolCard
                       key={m.school_id}
@@ -136,15 +164,27 @@ export default function AssessmentPage() {
             );
           })}
 
-          {/* 底部留资 CTA */}
+          {/* 底部留资 CTA — R-Design: 暖橙渐变 + 装饰 */}
           {!captured && (
-            <div className="mt-8 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-8 text-center text-white">
-              <h3 className="text-xl font-bold">想要完整申请方案？</h3>
-              <p className="mt-2 text-blue-100">留下联系方式，顾问为你定制选校清单和申请时间线</p>
-              <button onClick={() => setShowCapture(true)}
-                      className="mt-4 bg-white text-blue-700 font-semibold px-6 py-3 rounded-xl hover:bg-blue-50">
-                免费获取完整方案
-              </button>
+            <div className="relative overflow-hidden mt-12 bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 rounded-3xl p-10 md:p-12 text-center text-white shadow-lift">
+              <div aria-hidden className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-white/10 blur-2xl" />
+              <div aria-hidden className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-primary-300/30 blur-3xl" />
+              <div className="relative">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-white/20 backdrop-blur text-2xl mb-4">
+                  🎁
+                </div>
+                <h3 className="text-2xl md:text-3xl font-bold tracking-tight">想要完整申请方案？</h3>
+                <p className="mt-3 text-primary-50 max-w-md mx-auto">
+                  留下联系方式，顾问为你定制选校清单和申请时间线
+                </p>
+                <button
+                  onClick={() => setShowCapture(true)}
+                  className="mt-7 inline-flex items-center gap-2 bg-white text-primary-700 font-bold px-8 py-4 rounded-2xl text-base shadow-lift hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(0,0,0,0.2)] transition-all"
+                >
+                  免费获取完整方案
+                  <span aria-hidden>→</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -161,8 +201,12 @@ export default function AssessmentPage() {
       )}
 
       {captured && (
-        <div className="mt-8 bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center text-emerald-700">
-          ✓ 已收到你的信息，顾问会尽快联系你
+        <div className="mt-10 bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-8 text-center shadow-soft">
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-500 text-white text-2xl mb-3">
+            ✓
+          </div>
+          <p className="text-emerald-800 font-semibold text-lg">已收到你的信息</p>
+          <p className="text-emerald-600 text-sm mt-1">顾问会尽快联系你</p>
         </div>
       )}
     </Container>

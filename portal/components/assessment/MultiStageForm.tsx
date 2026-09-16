@@ -662,48 +662,59 @@ export function MultiStageForm({ onSubmit, loading, initialData, onTrack, onData
         )}
       </div>
 
-      {/* 导航 */}
-      {/* R-UI (2026-07-21): 加上 flex justify-between 让「上一步/下一步」两端对齐, 中间留白
-          (之前没 flex, 三元素挤左对齐, 加中间「步骤 X/6」直接跟左边按钮粘在一起)
-          删掉中间的「步骤 X/6」— 顶部 6 圈圆圈 + 进度条已足够表明进度 */}
-      {/* T1-X (2026-07-25 BUG-003+004 fix): 移动端 fixed bottom-0 始终贴视口底部, 桌面端恢复 static
-          - iOS safe-area-inset-bottom 适配 notch
-          - 移动端加 z-50 + backdrop-blur 让按钮在所有 modal 之上的 sticky
-          - 桌面 md:static 让 Card 自身 sticky 接管 (lg:sticky top-20) */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 -mx-6 -mb-6 mt-6 px-6 py-4 border-t border-gray-100 bg-white/95 backdrop-blur-sm shadow-[0_-4px_12px_rgba(0,0,0,0.08)] md:static md:mx-0 md:mb-0 md:px-0 md:py-0 md:relative md:z-auto md:backdrop-blur-0 md:shadow-none rounded-b-2xl"
+      {/* 导航 — R-Design 2026-09-16: 更大更醒目
+          问题: 移动端按钮 px-4 py-2 偏小, 白底跟 Card 融为一体, 用户"看不清下一步"
+          修法:
+            1. 按钮加大到 px-6 py-3, 字号 text-base, 加 shadow-glow-primary
+            2. 渐变主色 from-primary-500 to-primary-600, hover 上浮
+            3. 移动端固定底栏用更强的顶部分隔 (border + shadow + bg-white 不透)
+            4. 「上一步」改 btn-ghost 但保留可点区域, 不至于隐形
+      */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 -mx-6 -mb-6 mt-6 px-5 py-4 border-t-2 border-primary-100 bg-white shadow-[0_-8px_24px_rgba(15,23,42,0.12)] md:static md:mx-0 md:mb-0 md:px-0 md:py-0 md:mt-8 md:pt-6 md:border-t md:border-gray-100 md:relative md:z-auto md:shadow-none md:bg-transparent rounded-b-2xl"
            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
         <div className="flex items-center justify-between gap-3">
           <button
             onClick={back}
             disabled={step === 1}
-            className="px-3 py-2 text-sm text-gray-600 hover:text-gray-900 disabled:opacity-30 inline-flex items-center gap-1"
+            className="btn-ghost disabled:opacity-30"
           >
             <ChevronLeft className="w-4 h-4" />
             上一步
           </button>
+
+          {/* 移动端当前步指示 (桌面端顶部进度条已够) */}
+          <span className="text-xs font-medium text-gray-400 md:hidden">
+            第 {step} / 6 步
+          </span>
+
           {step < 6 ? (
             <button
               onClick={next}
               disabled={!canNext()}
-              className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 inline-flex items-center gap-1"
+              className="btn-primary px-6 py-3 text-base"
             >
               下一步
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-5 h-5" />
             </button>
           ) : (
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg disabled:opacity-50 inline-flex items-center gap-1.5"
+              className="inline-flex items-center justify-center gap-2 px-6 py-3 text-base rounded-xl font-semibold text-white
+                         bg-gradient-to-br from-emerald-500 to-emerald-600
+                         shadow-[0_4px_20px_rgba(16,185,129,0.32)]
+                         hover:from-emerald-600 hover:to-emerald-700 hover:shadow-lift hover:-translate-y-0.5
+                         active:translate-y-0 transition-all duration-200
+                         disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
             >
               {loading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  评估中
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  评估中…
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4" />
+                  <Sparkles className="w-5 h-5" />
                   开始评估
                 </>
               )}
@@ -719,7 +730,20 @@ export function MultiStageForm({ onSubmit, loading, initialData, onTrack, onData
 function StepProgress({ currentStep, onJump }: { currentStep: number; onJump: (s: number) => void }) {
   return (
     <div>
-      <div className="flex items-center justify-between gap-1 mb-3">
+      {/* R-Design 2026-09-16: 进度圆点更醒目
+          - current: 大一号 + glow 阴影 + ring 聚焦
+          - past: 翠绿 + hover scale
+          - 连线: 每两段之间画 4px 渐变线 (用 absolute 布局, 替代 hidden)
+          - 底部进度条: 加粗到 h-1.5, 颜色用 primary→emerald 渐变, 跟圆点呼应
+      */}
+      <div className="relative flex items-start justify-between gap-0.5 mb-4 px-1">
+        {/* 底部连线 (跨整个进度条) */}
+        <div aria-hidden className="absolute top-[18px] left-6 right-6 h-0.5 bg-gray-200 rounded-full -z-0" />
+        <div
+          aria-hidden
+          className="absolute top-[18px] left-6 h-0.5 bg-gradient-to-r from-emerald-400 to-primary-400 rounded-full transition-all duration-500 -z-0"
+          style={{ width: `calc(${(Math.min(currentStep - 1, 5) / 5) * 100}% - 0px)` }}
+        />
         {STEPS.map((s, i) => {
           const Icon = s.icon;
           const isCurrent = currentStep === s.id;
@@ -727,38 +751,44 @@ function StepProgress({ currentStep, onJump }: { currentStep: number; onJump: (s
           return (
             <div
               key={s.id}
-              className="flex-1 flex flex-col items-center gap-1"
+              className="flex-1 flex flex-col items-center gap-1.5 relative z-10"
             >
               <button
                 onClick={() => onJump(s.id)}
                 disabled={!isPast && !isCurrent}
-                className={`w-9 h-9 rounded-full flex items-center justify-center transition ${
-                  isCurrent ? 'bg-primary-600 text-white shadow-md' :
-                  isPast ? 'bg-emerald-500 text-white cursor-pointer hover:scale-110' :
-                  'bg-gray-100 text-gray-400 cursor-not-allowed'
+                className={`rounded-full flex items-center justify-center transition-all duration-200 ${
+                  isCurrent
+                    ? 'w-11 h-11 bg-gradient-to-br from-primary-500 to-primary-600 text-white shadow-glow-primary ring-4 ring-primary-100 scale-105'
+                    : isPast
+                    ? 'w-9 h-9 bg-emerald-500 text-white cursor-pointer hover:scale-110 shadow-md'
+                    : 'w-9 h-9 bg-white border-2 border-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
                 title={s.name}
               >
-                {isPast ? <CheckCircle2 className="w-5 h-5" /> : <Icon className="w-5 h-5" strokeWidth={1.75} />}
+                {isPast ? <CheckCircle2 className="w-5 h-5" /> : <Icon className={isCurrent ? 'w-5 h-5' : 'w-4 h-4'} strokeWidth={isCurrent ? 2 : 1.75} />}
               </button>
-              <div className={`text-[10px] text-center ${isCurrent ? 'text-primary-700 font-semibold' : 'text-gray-500'}`}>
+              <div className={`text-[11px] text-center leading-tight font-medium transition-colors ${
+                isCurrent ? 'text-primary-700' : isPast ? 'text-emerald-700' : 'text-gray-400'
+              }`}>
                 {s.name}
               </div>
-              {i < STEPS.length - 1 && (
-                <div className={`hidden absolute h-0.5 ${
-                  isPast ? 'bg-emerald-400' : 'bg-gray-200'
-                }`} />
-              )}
             </div>
           );
         })}
       </div>
-      <div className="h-1 bg-gray-100 rounded-full overflow-hidden mt-1">
+      {/* 进度条 (桌面 / 移动一致) */}
+      <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden shadow-inner">
         <div
-          className="h-full bg-gradient-to-r from-primary-500 to-emerald-500 transition-all"
+          className="h-full bg-gradient-to-r from-primary-500 via-primary-400 to-emerald-500 transition-all duration-500 rounded-full"
           style={{ width: `${(currentStep / 6) * 100}%` }}
         />
       </div>
+      {/* 当前步描述 (移动端用户容易迷失, 加一行说明) */}
+      <p className="mt-3 text-center text-sm text-gray-500">
+        <span className="font-semibold text-primary-700">第 {currentStep} 步</span>
+        <span className="mx-1.5 text-gray-300">·</span>
+        {STEPS[currentStep - 1].desc}
+      </p>
     </div>
   );
 }

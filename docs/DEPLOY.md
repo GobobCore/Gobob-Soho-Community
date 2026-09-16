@@ -60,3 +60,23 @@ cd app && python3 serve.py   # 19003，反代 /api → 19001
 # 获客门户
 cd portal && npm install && SOHO_BACKEND_URL=http://127.0.0.1:19001 npm run dev  # 19002
 ```
+
+## 与 Gobob 主站联调（SMB API）
+
+Gobob SOHO 的智能评估/院校数据由 Gobob 主站 `/api/smb/v1/*` 提供。
+
+| 环境 | GOBOB_API_BASE | 说明 |
+|---|---|---|
+| 本机 dev | `http://127.0.0.1:18797` | 本机 Gobob backend（master 库） |
+| tj0 生产 | `https://api.gobob.cn`（或 `http://<tj0-ip>:18797`） | 线上主站 |
+| hk0 备用 | 同 tj0（只读副本） | 读操作走 hk0 replication，写（api_keys）只能 tj0 |
+
+**API Key 管理**：
+- 签发：`python3 backend/create_api_key_script.py`（见 `docs/SMB_API_DEPLOY.md` 主仓）
+- 写操作（api_keys INSERT/UPDATE）只能在 **tj0 master** 执行；hk0 是 slave 只读副本
+- 本机 dev 已签发：`gob_K0LxZjcv...IBL4`（含 6 个 smb scope）
+- tj0 已签发：`gob_bEb4wl0aH_32paTInbRPmybngNVbRazX`
+
+**Slave 只读兼容**：
+- 主仓 `GOBOB_SKIP_MIGRATIONS=1` 环境变量：跳过 startup init + migration framework + api_key usage_count 更新
+- 在 hk0 systemd unit 已设：`/etc/systemd/system/gobob-backend.service`

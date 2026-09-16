@@ -38,7 +38,7 @@ jobs:
           "
 
   portal-build:
-    name: Portal (Next.js) build
+    name: Portal (Next.js) build + vitest
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,6 +49,10 @@ jobs:
           cd community/portal
           npm install --no-audit --no-fund
           npm run build
+      - name: Vitest (R-Feat 2026-09-16: 关键组件测试)
+        run: |
+          cd community/portal
+          npm run test
       - name: Verify .next exists
         run: |
           test -d community/portal/.next && echo "✓ portal build OK"

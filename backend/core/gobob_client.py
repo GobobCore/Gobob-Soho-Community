@@ -139,8 +139,83 @@ def get_school(school_id: str) -> dict | None:
 
 
 def match(student_input: dict) -> dict | None:
-    """智能匹配 Top N。POST，不缓存。"""
-    return _post("/api/smb/v1/match", student_input)
+    """智能匹配 Top N。POST，不缓存。
+
+    R-Fix (2026-09-16): 前端 form 字段名 (current_stage/school_id/gpa/english_score) →
+    Gobob match 期望字段名 (current_edu_level/toefl/gre_total) 的映射.
+    """
+    mapped = _map_to_gobob_match(student_input)
+    return _post("/api/smb/v1/match", mapped)
+
+
+def _map_to_gobob_match(f: dict) -> dict:
+    """前端 form → Gobob match body 字段名 + 白名单映射。
+
+    前端 form 含 30+ 字段, Gobob match 期望严格 schema (RejectExtras),
+    多余字段直接报 ValidationError. 这里只挑 Gobob 认识的字段.
+    """
+    m = {}
+    # 1) current_edu_level (前端 current_stage 字符串)
+    if "current_stage" in f and "current_edu_level" not in f:
+        m["current_edu_level"] = f["current_stage"]
+    elif "current_edu_level" in f:
+        m["current_edu_level"] = f["current_edu_level"]
+    # 2) target_countries (ISO 代码数组, 前端已是 ISO 数组)
+    if "target_countries" in f and f["target_countries"]:
+        m["target_countries"] = f["target_countries"]
+    # 3) target_degree (字符串)
+    if "target_degree" in f and f["target_degree"]:
+        m["target_degree"] = f["target_degree"]
+    # 4) target_intake (e.g. "2027 Fall")
+    if "target_intake" in f and f["target_intake"]:
+        m["target_intake"] = f["target_intake"]
+    # 5) target_major (英文名)
+    if "target_major" in f and f["target_major"]:
+        m["target_major"] = f["target_major"]
+    # 6) current_school_id
+    if "current_school_id" in f and f["current_school_id"]:
+        m["current_school_id"] = f["current_school_id"]
+    # 7) current_school_tier 1=985/2=211/3=双非/4=海外 → Gobob 字符串
+    tier_map = {1: "985", 2: "211", 3: "double_first_class_b", 4: "overseas"}
+    if "current_school_tier" in f and f["current_school_tier"] in tier_map:
+        m["current_school_tier"] = tier_map[f["current_school_tier"]]
+    # 8) gpa + gpa_scale (若 scale=100, 换算成 4.0)
+    if "gpa" in f and f["gpa"]:
+        gpa = float(f["gpa"])
+        scale = f.get("gpa_scale", "4.0")
+        if scale == "100":
+            gpa = round(gpa / 25, 2)  # 100/25 ≈ 4.0
+        elif scale == "5.0":
+            gpa = round(gpa / 5 * 4, 2)
+        elif scale == "4.3":
+            gpa = round(gpa / 4.3 * 4, 2)
+        m["gpa"] = gpa
+    # 9) 英语分数 → toefl/ielts/pte/duolingo (Gobob 期望字段)
+    test = f.get("english_test", "")
+    score = f.get("english_score")
+    if score and test:
+        key = {"TOEFL": "toefl", "IELTS": "ielts", "PTE": "pte", "Duolingo": "duolingo"}.get(test.upper(), "toefl")
+        m[key] = score
+    # 10) GRE/GMAT 分数
+    if "gre_total" in f and f["gre_total"]:
+        m["gre_total"] = f["gre_total"]
+    if "gmat_total" in f and f["gmat_total"]:
+        m["gmat_total"] = f["gmat_total"]
+    # 11) 软背景 (research/internship/工作年限)
+    for k in ("research_exp", "internship_exp", "work_years"):
+        if k in f and f[k] is not None:
+            m[k] = f[k]
+    # 12) 预算 (Gobob 期望 RMB, 前端单位是 万)
+    if "budget_min" in f and f["budget_min"]:
+        m["budget_min"] = int(f["budget_min"]) * 10000
+        m["budget_max"] = int(f.get("budget_max", f["budget_min"])) * 10000
+    # 13) 跨专业申请 (Gobob boolean)
+    if "cross_disciplinary" in f:
+        m["cross_disciplinary"] = f["cross_disciplinary"]
+    # 14) 留学身份
+    if "current_stage_year" in f:
+        m["current_stage_year"] = f["current_stage_year"]
+    return m
 
 
 def match_single(payload: dict) -> dict | None:

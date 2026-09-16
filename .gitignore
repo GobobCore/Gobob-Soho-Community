@@ -40,3 +40,10 @@ cloud/portal-saas/.next/
 cloud/app-saas/node_modules/
 community/app/node_modules/
 cloud/soho-ops/node_modules/
+
+# ═══════════════════════════════════════════════════════════
+# SaaS 闭源 (cloud/) — 不上 GitHub
+# ═══════════════════════════════════════════════════════════
+# 运营后台 + 计费 + 多机构 + SaaS 支付 都是商业资产, 闭源
+# 只推 intsch (内部 Gitea), 不推 GitHub
+cloud/

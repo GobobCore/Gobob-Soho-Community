@@ -56,39 +56,40 @@
         const role = this.user.role;
         const isStaff = role === "owner" || role === "advisor";
         const isOwner = role === "owner";
+        const I = S.ICONS;  // R-Design 2026-09-16: 扁平化 SVG 图标 (替代 emoji)
         if (isStaff) {
           const g = [
-            { title: "总览", items: [{ view: "dashboard", label: "驾驶舱", icon: "📊" }] },
+            { title: "总览", items: [{ view: "dashboard", label: "驾驶舱", icon: I.dashboard }] },
             { title: "业务", items: [
-              { view: "leads", label: "线索池", icon: "🎯" },
-              { view: "students", label: "学生", icon: "👨‍🎓" },
-              { view: "contracts", label: "签约", icon: "📄" },
+              { view: "leads", label: "线索池", icon: I.leads },
+              { view: "students", label: "学生", icon: I.students },
+              { view: "contracts", label: "签约", icon: I.contracts },
             ] },
           ];
           if (isOwner) {
             g.push({ title: "管理", items: [
-              { view: "staff", label: "员工", icon: "👥" },
-              { view: "collisions", label: "撞单", icon: "⚡" },
-              { view: "reports", label: "报表", icon: "📈" },
-              { view: "settings", label: "设置", icon: "⚙️" },
+              { view: "staff", label: "员工", icon: I.staff },
+              { view: "collisions", label: "撞单", icon: I.collisions },
+              { view: "reports", label: "报表", icon: I.reports },
+              { view: "settings", label: "设置", icon: I.settings },
             ] });
           }
           g.push({ title: "沟通", items: [
-            { view: "messages", label: "消息", icon: "💬" },
-            { view: "notifications", label: "通知", icon: "🔔" },
+            { view: "messages", label: "消息", icon: I.messages },
+            { view: "notifications", label: "通知", icon: I.notifications },
           ] });
           return g;
         }
         // 学生/家长端
         return [
           { title: "我的", items: [
-            { view: "my-progress", label: "我的进度", icon: "🗺️" },
-            { view: "my-tasks", label: "我的任务", icon: "✅" },
-            { view: "my-contract", label: "我的合同", icon: "📄" },
+            { view: "my-progress", label: "我的进度", icon: I.myProgress },
+            { view: "my-tasks", label: "我的任务", icon: I.myTasks },
+            { view: "my-contract", label: "我的合同", icon: I.myContract },
           ] },
           { title: "沟通", items: [
-            { view: "messages", label: "消息", icon: "💬" },
-            { view: "notifications", label: "通知", icon: "🔔" },
+            { view: "messages", label: "消息", icon: I.messages },
+            { view: "notifications", label: "通知", icon: I.notifications },
           ] },
         ];
       },

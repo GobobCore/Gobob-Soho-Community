@@ -107,7 +107,10 @@
                 </div>
               </div>
               <div class="flex gap-4 text-xs text-slate-500 mt-1.5">
-                <span class="text-emerald-600">✓ 已完成 {{ s.task_stats.done }}</span>
+                <span class="text-emerald-600 inline-flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><path d="M20 6 9 17l-5-5"/></svg>
+                  已完成 {{ s.task_stats.done }}
+                </span>
                 <span class="text-amber-600">● 进行中 {{ s.task_stats.doing }}</span>
                 <span class="text-slate-400">○ 待办 {{ s.task_stats.todo }}</span>
               </div>
@@ -357,7 +360,10 @@
               <option v-for="a in advisors" :value="a.id">{{ a.name }}</option>
             </select>
             <button v-if="lead.status!=='converted'" @click="convert" class="bg-emerald-600 text-white rounded-lg px-3 py-1.5 text-sm">转化为学生</button>
-            <span v-else class="text-emerald-600 text-sm py-1.5">✓ 已转化</span>
+            <span v-else class="text-emerald-600 text-sm py-1.5 inline-flex items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><path d="M20 6 9 17l-5-5"/></svg>
+              已转化
+            </span>
           </div>
 
           <!-- Phase 5: 流失原因弹窗 -->
@@ -561,7 +567,7 @@
             <card title="里程碑">
               <empty v-if="!milestones.length"></empty>
               <div v-for="m in milestones" :key="m.id" class="flex items-center gap-2 py-2 border-b border-slate-100 last:border-0">
-                <button @click="toggleMilestone(m)" class="text-lg">{{ m.status==='done'?'✅':(m.status==='in_progress'?'🔵':'⚪') }}</button>
+                <button @click="toggleMilestone(m)" class="w-5 h-5 rounded-full border-2 transition-all" :class="m.status==='done'?'bg-emerald-500 border-emerald-500':(m.status==='in_progress'?'bg-blue-500 border-blue-500':'bg-white border-slate-300 hover:border-slate-400')"></button>
                 <div class="flex-1 text-sm" :class="m.status==='done'?'line-through text-slate-400':''">{{ m.title }}</div>
                 <div class="text-xs text-slate-400">{{ ctx.shared.fmtDate(m.due_date) }}</div>
               </div>
@@ -569,7 +575,7 @@
             <card title="任务">
               <empty v-if="!tasks.length"></empty>
               <div v-for="t in tasks" :key="t.id" class="flex items-center gap-2 py-2 border-b border-slate-100 last:border-0">
-                <button @click="toggleTask(t)" class="text-lg">{{ t.status==='done'?'✅':'⚪' }}</button>
+                <button @click="toggleTask(t)" class="w-5 h-5 rounded-full border-2 transition-all" :class="t.status==='done'?'bg-emerald-500 border-emerald-500':'bg-white border-slate-300 hover:border-slate-400'"></button>
                 <div class="flex-1 text-sm" :class="t.status==='done'?'line-through text-slate-400':''">
                   {{ t.title }} <tag v-if="t.phase" :label="ctx.shared.PHASE_LABEL[t.phase]" color="slate"></tag>
                 </div>
@@ -633,7 +639,7 @@
                   <div v-if="v.comments && v.comments.length" class="border-t pt-2 mt-2 space-y-1">
                     <div v-for="c in v.comments" :key="c.id" class="text-xs flex gap-2">
                       <span :class="c.decision==='approve'?'text-emerald-600':(c.decision==='reject'?'text-red-600':'text-slate-500')">
-                        {{ ({approve:'✓ 通过',reject:'✗ 驳回',comment:'💬 评论'})[c.decision] }}
+                        {{ ({approve:'通过',reject:'驳回',comment:'评论'})[c.decision] }}
                       </span>
                       <span class="text-slate-400">{{ c.reviewer_name }}:</span>
                       <span class="text-slate-600">{{ c.content }}</span>
@@ -1288,7 +1294,13 @@
         <card title="里程碑" class="mt-4">
           <empty v-if="!milestones.length" text="老师还没有为你规划里程碑"></empty>
           <div v-for="m in milestones" :key="m.id" class="flex items-center gap-3 py-2.5 border-b border-slate-100 last:border-0">
-            <span class="text-xl">{{ m.status==='done'?'✅':(m.status==='in_progress'?'🔵':'⚪') }}</span>
+            <span class="inline-flex items-center">
+              <span v-if="m.status==='done'" class="w-5 h-5 rounded-full bg-emerald-500 inline-flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><path d="M20 6 9 17l-5-5"/></svg>
+              </span>
+              <span v-else-if="m.status==='in_progress'" class="w-5 h-5 rounded-full bg-blue-500 inline-block"></span>
+              <span v-else class="w-5 h-5 rounded-full border-2 border-slate-300 bg-white inline-block"></span>
+            </span>
             <div class="flex-1">
               <div class="text-sm font-medium" :class="m.status==='done'?'line-through text-slate-400':''">{{ m.title }}</div>
               <div class="text-xs text-slate-400">{{ m.phase?ctx.shared.PHASE_LABEL[m.phase]:'' }}</div>
@@ -1331,7 +1343,9 @@
         <div v-if="loading" class="text-sm text-slate-400">加载中…</div>
         <empty v-else-if="!tasks.length"></empty>
         <div v-else v-for="t in tasks" :key="t.id" class="flex items-center gap-3 py-2.5 border-b border-slate-100 last:border-0">
-          <button @click="toggle(t)" class="text-xl">{{ t.status==='done'?'✅':'⚪' }}</button>
+          <button @click="toggle(t)" class="w-5 h-5 rounded-full border-2 transition-all inline-flex items-center justify-center" :class="t.status==='done'?'bg-emerald-500 border-emerald-500':'bg-white border-slate-300 hover:border-slate-400'">
+            <svg v-if="t.status==='done'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3"><path d="M20 6 9 17l-5-5"/></svg>
+          </button>
           <div class="flex-1">
             <div class="text-sm" :class="t.status==='done'?'line-through text-slate-400':'font-medium'">{{ t.title }}</div>
             <div v-if="t.description" class="text-xs text-slate-400">{{ t.description }}</div>

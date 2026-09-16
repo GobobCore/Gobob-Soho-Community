@@ -410,7 +410,27 @@ export function MultiStageForm({ onSubmit, loading, initialData, onTrack, onData
   useEffect(() => {
     fetch(`${BFF_BASE_URL}/api/assessment/meta`)
       .then((r) => r.ok ? r.json() : null)
-      .then(setMeta)
+      .then((raw: any) => {
+        if (!raw) return setMeta(null);
+        // 字段映射：后端 country_id/iso_code/country_name/flag_emoji -> 前端 id/iso/name_cn/flag
+        const adapted = {
+          ...raw,
+          countries: (raw.countries || []).map((c: any) => ({
+            id: c.country_id,
+            iso: c.iso_code,
+            name_cn: c.country_name,
+            flag: c.flag_emoji,
+            primary_language: c.primary_language,
+            english_required: !!c.english_required,
+            english_tests: c.accepted_english_tests,
+            local_test: c.local_language_test,
+            local_required: !!c.local_test_required,
+            standardized_tests: c.standardized_tests,
+            notes: c.notes,
+          })),
+        };
+        setMeta(adapted);
+      })
       .catch(() => {});
   }, []);
 

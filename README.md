@@ -41,10 +41,14 @@ Gobob SOHO 是一个**独立部署、独立数据库**的业务管理系统，�
 
 ## 快速开始
 
+**Docker (推荐, 生产)**:
+
 ```bash
 cp .env.example .env       # 填入你的配置（含 Gobob API Key，见下）
 docker compose up -d       # 起 mysql + backend + portal + app
 ```
+
+**本机裸机 (开发/测试)**: 见 [`docs/QUICKSTART_LOCAL.md`](docs/QUICKSTART_LOCAL.md) (5 分钟跑起来) 或 [`docs/DEPLOY_LOCAL_SYSTEMD.md`](docs/DEPLOY_LOCAL_SYSTEMD.md) (systemd 长期跑)
 
 打开：
 - 获客门户 http://localhost:19002
@@ -73,9 +77,17 @@ deploy/     docker-compose 与部署脚本
 
 ## 文档
 
-- [部署指南](docs/DEPLOY.md)
+**部署**:
+- [部署指南 (Docker)](docs/DEPLOY.md)
+- [本机裸机 5 分钟 quickstart](docs/QUICKSTART_LOCAL.md)
+- [本机 systemd 长期跑](docs/DEPLOY_LOCAL_SYSTEMD.md)
+
+**集成**:
+- [获取 Gobob API Key](docs/GETTING_GOBOB_API_KEY.md)
 - [配置说明](docs/CONFIG.md)
 - [API 说明](docs/API.md)
+
+**贡献**:
 - [贡献指南](CONTRIBUTING.md)
 
 ---

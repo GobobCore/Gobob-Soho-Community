@@ -60,14 +60,12 @@ docker compose up -d
 PM 后面想 100% 独立 repo, 30 秒拆:
 
 ```bash
-# 在 Gobob-SOHO 仓里
-git subtree split --prefix=community -b community-only
-# 推到新仓 (PM 在 GitHub 先建 GobobCore/Gobob-SOHO-Community)
-git push git@github.com:GobobCore/Gobob-SOHO-Community.git community-only:main
-# 然后同步 shared 进去 (社区版需要业务核心)
-cd Gobob-SOHO-Community
-git remote add upstream ../Gobob-SOHO
-git pull upstream main --allow-unrelated-histories --no-ff
+# 1. PM 在 GitHub 端手动建 GobobCore/Gobob-SOHO-Community (public, Apache-2.0)
+# 2. 跑我们准备好的脚本:
+bash scripts/push_community_subtree.sh
+# (脚本里调 git subtree push --prefix=community git@github.com:GobobCore/Gobob-SOHO-Community.git main)
+# 3. shared/ 不在 split 里, 社区版需要的代码会在 subtree push 时自动复制
+# 4. 之后每次 community/ 改动, 同步: 同上 git subtree push 命令
 ```
 
 或者更简单: 用 `git subtree add` 把 shared 复制进去, 定期从主仓 pull。

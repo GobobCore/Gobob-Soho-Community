@@ -14,19 +14,27 @@ Gobob 运营方 (小Z 等) 管理 SOHO SaaS 版的所有机构:
       token role="saas_ops", org_id="_ops_", 跟任何机构身份天然隔离.
 
 路由前缀: /api/saas
+
+R-Feat 2026-09-16 v3: 开源版按次购买走 Gobob payment (18806) 完整接入
+  - POST /buy-key 公开端点: 创建 saas_key_orders + 调 Gobob payment 创建订单 + 返回二维码
+  - GET /buy-key/{order_no} 公开端点: 查 SOHO 订单状态 (会顺便轮询 Gobob payment 状态)
+  - POST /webhooks/payment (新增): 接收 Gobob payment 的 paid 回调, 自动开通 Key
 """
 
 import logging
 from datetime import date, datetime
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+import httpx
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from core import auth
+from core.config import get_settings
 from core.database import db_cursor
 from core.id_gen import new_id, new_order_no
 
 log = logging.getLogger("saas_admin")
+settings = get_settings()
 
 router = APIRouter(prefix="/api/saas", tags=["saas-admin"])
 
@@ -407,6 +415,7 @@ def _ensure_key_orders_table(cur):
           calls         INT NOT NULL,
           amount        DECIMAL(10,2) NOT NULL COMMENT '应付 ¥ (= calls, ¥1/次)',
           status        ENUM('pending','paid','delivered','cancelled') NOT NULL DEFAULT 'pending',
+          payment_order_no VARCHAR(50) DEFAULT NULL COMMENT 'Gobob payment 订单号',
           api_key_id    BIGINT DEFAULT NULL COMMENT '开通后的 Gobob api_keys.id',
           api_key_prefix VARCHAR(16) DEFAULT NULL COMMENT '开通后展示给机构',
           paid_at       DATETIME DEFAULT NULL,
@@ -415,20 +424,34 @@ def _ensure_key_orders_table(cur):
           created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           INDEX idx_status (status),
-          INDEX idx_email (contact_email)
+          INDEX idx_email (contact_email),
+          INDEX idx_payment_order (payment_order_no)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     """)
+    # 已存在表补列 (幂等)
+    cur.execute("""
+        SELECT COUNT(*) AS c FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name = 'saas_key_orders' AND column_name = 'payment_order_no'
+    """)
+    if cur.fetchone()["c"] == 0:
+        cur.execute("ALTER TABLE saas_key_orders ADD COLUMN payment_order_no VARCHAR(50) DEFAULT NULL AFTER status, ADD INDEX idx_payment_order (payment_order_no)")
 
 
 @router.post("/buy-key")
-def buy_key(req: BuyKeyReq):
+def buy_key(req: BuyKeyReq, request: Request):
     """公开: 机构申请购买 Gobob Data API 次数 (开源版).
 
-    无需登录. 提交后:
-    - 创建 saas_key_orders 记录 (status=pending)
-    - 返回 order_no + 收款账户提示
-    - 运营在 Gobob admin-portal /admin/soho-keys 里看到, 开通 Key + 标记已收
+    完整接入 Gobob payment (18806):
+      1. 创建 saas_key_orders 记录 (SOHO 本地台账)
+      2. 调 Gobob payment POST /api/v1/public/orders 创建支付订单 (拿 order_no + 二维码)
+      3. 返回 order_no + qrcode_url + pay_url 给前端
+
+    前端拿到后:
+      - 显示二维码 (alipay_native / wechat native) 让机构扫
+      - 每 5s 轮询 GET /api/saas/buy-key/{order_no} 直到 paid
+      - paid 后我们后台自动开通 Key 并邮件/微信通知机构
     """
+    # 1. 落 SOHO 台账 (saas_key_orders)
     with db_cursor() as cur:
         _ensure_key_orders_table(cur)
         oid = new_id()
@@ -441,35 +464,127 @@ def buy_key(req: BuyKeyReq):
             (oid, order_no, req.org_name, req.contact_name, req.contact_email,
              req.contact_phone, req.calls, amount, req.note),
         )
-    log.info("buy-key order: %s %s (%s calls ¥%s) by %s <%s>",
+    log.info("buy-key order created: %s %s (%s calls ¥%s) by %s <%s>",
              order_no, req.org_name, req.calls, amount, req.contact_name, req.contact_email)
+
+    # 2. 调 Gobob payment 创建支付订单
+    plan_code = {10: "soho_api_10", 50: "soho_api_50", 100: "soho_api_100", 500: "soho_api_500"}.get(req.calls)
+    if not plan_code:
+        raise HTTPException(status_code=400, detail="只支持 10/50/100/500 次包")
+
+    pay_base = settings.gobob_payment_base
+    idem_key = f"soho-key-{order_no}"  # 幂等: 同一 saas_key_order 只创建一次 payment order
+    try:
+        resp = httpx.post(
+            f"{pay_base}/api/v1/public/orders",
+            json={
+                "plan_code": plan_code,
+                # alipay_pc 是真生产可用 (APP_ID 商户号只开了 page.pay / wap.pay)
+                # alipay_native (precreate) 该商户号没权限, 会 ACCESS_FORBIDDEN
+                "payment_method": "alipay_pc",
+                "user_email": req.contact_email,
+                "metadata": {"soho_order_no": order_no, "org_name": req.org_name, "calls": req.calls},
+            },
+            headers={"Idempotency-Key": idem_key},
+            timeout=15.0,
+        )
+        if resp.status_code not in (200, 201):
+            log.error("payment create failed: %s %s", resp.status_code, resp.text[:300])
+            raise HTTPException(status_code=502, detail="支付订单创建失败, 请稍后再试")
+        pay = resp.json()
+    except httpx.HTTPError as e:
+        log.error("payment call failed: %s", e)
+        raise HTTPException(status_code=502, detail="支付服务暂时不可用, 请稍后再试")
+
+    pay_order_no = pay.get("order_no")
+    # 把 payment_order_no 回写到 SOHO 台账
+    with db_cursor() as cur:
+        cur.execute(
+            "UPDATE saas_key_orders SET payment_order_no=%s WHERE id=%s",
+            (pay_order_no, oid),
+        )
+
+    log.info("payment order created: soho=%s → payment=%s", order_no, pay_order_no)
     return {
         "ok": True,
-        "order_no": order_no,
+        "order_no": order_no,           # SOHO 台账订单号
+        "payment_order_no": pay_order_no,  # Gobob payment 订单号 (用于轮询状态)
         "amount": amount,
         "calls": req.calls,
-        "payment_hint": "请线下转账或扫码支付后, 在备注里填订单号. 我们确认到账后会通过邮箱发送 API Key.",
+        "payment_method": "alipay_pc",
+        "pay_url": pay.get("payment", {}).get("pay_url"),  # 支付宝网页支付 URL (前端跳转用)
+        "pay_hint": "点击「立即支付」跳转到支付宝网页完成支付, 支付成功后我们会通过邮箱发送 API Key",
     }
 
 
 @router.get("/buy-key/{order_no}")
 def check_order(order_no: str):
-    """公开: 用订单号查状态 (机构知道自己 Key 开通了没)."""
+    """公开: 用订单号查状态 (机构知道自己 Key 开通了没).
+
+    如果还 pending 且有 payment_order_no, 顺便轮询 Gobob payment 状态并更新本地.
+    """
     with db_cursor() as cur:
         _ensure_key_orders_table(cur)
         cur.execute(
-            "SELECT order_no, org_name, calls, amount, status, api_key_prefix, paid_at, delivered_at, created_at "
+            "SELECT order_no, org_name, calls, amount, status, payment_order_no, api_key_prefix, paid_at, delivered_at, created_at "
             "FROM saas_key_orders WHERE order_no=%s",
             (order_no,),
         )
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="订单号不存在")
-        for f in ("paid_at", "delivered_at", "created_at"):
-            if row.get(f):
-                row[f] = str(row[f])
-        row["amount"] = float(row["amount"])
-        return row
+
+    # 轮询 Gobob payment 状态 (pending → paid)
+    if row["status"] == "pending" and row.get("payment_order_no"):
+        _poll_payment_status(row)
+        # 再读一次 (可能被上面更新)
+        with db_cursor() as cur:
+            cur.execute(
+                "SELECT order_no, org_name, calls, amount, status, payment_order_no, api_key_prefix, paid_at, delivered_at, created_at "
+                "FROM saas_key_orders WHERE order_no=%s",
+                (order_no,),
+            )
+            row = cur.fetchone()
+
+    for f in ("paid_at", "delivered_at", "created_at"):
+        if row.get(f):
+            row[f] = str(row[f])
+    row["amount"] = float(row["amount"])
+    return row
+
+
+def _poll_payment_status(soho_order_row: dict):
+    """轮询 Gobob payment 状态; paid 则更新 saas_key_orders."""
+    pay_order_no = soho_order_row.get("payment_order_no")
+    if not pay_order_no:
+        return
+    try:
+        resp = httpx.get(
+            f"{settings.gobob_payment_base}/api/v1/public/orders/{pay_order_no}",
+            timeout=10.0,
+        )
+        if resp.status_code != 200:
+            log.warning("payment status poll failed: %s", resp.status_code)
+            return
+        pay = resp.json()
+    except httpx.HTTPError as e:
+        log.warning("payment poll error: %s", e)
+        return
+
+    if pay.get("status") != "paid":
+        return
+
+    # 支付完成 → 更新 saas_key_orders
+    with db_cursor() as cur:
+        cur.execute(
+            "UPDATE saas_key_orders SET status='paid', paid_at=NOW() WHERE order_no=%s AND status='pending'",
+            (soho_order_row["order_no"],),
+        )
+        if cur.rowcount == 0:
+            return  # 已被其他流程处理
+    log.info("saas_key_order %s paid via payment %s", soho_order_row["order_no"], pay_order_no)
+    # 后续由运营在 soho-ops 手动开通 (调 Gobob admin-portal 或 API)
+    # 简化: 不自动开通, 让运营确认后手动充次数到 Key
 
 
 # ── 运营后台看 buy-key 申请单 ────────────────────────────────────

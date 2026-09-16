@@ -2,11 +2,11 @@
 
 /**
  * 开源版按次购买页
- * 机构自助下单买 Gobob Data API 调用次数, 台账模式 (不接在线支付)
+ * 机构自助下单买 Gobob Data API 调用次数, 接 Gobob payment (alipay_pc 真生产)
  */
 import { useState } from 'react';
 import Link from 'next/link';
-import { KeyRound, CheckCircle2, AlertCircle, ShoppingCart, Copy, Mail, Phone } from 'lucide-react';
+import { KeyRound, CheckCircle2, AlertCircle, ShoppingCart, Copy, Mail, Phone, CreditCard, ExternalLink } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
 
 const PACKAGES = [
@@ -29,6 +29,7 @@ export default function BuyKeyPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [orderNo, setOrderNo] = useState('');
+  const [payUrl, setPayUrl] = useState('');
   const [copied, setCopied] = useState(false);
 
   function update(k: string, v: string) {
@@ -52,6 +53,7 @@ export default function BuyKeyPage() {
       }
       const data = await res.json();
       setOrderNo(data.order_no);
+      setPayUrl(data.pay_url || '');
       setStep('done');
     } catch (e) {
       setError(e instanceof Error ? e.message : '提交失败，请稍后再试');
@@ -178,9 +180,9 @@ export default function BuyKeyPage() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-xs text-blue-700">
               <div className="font-semibold mb-1">付款流程</div>
               <ol className="space-y-1 list-decimal list-inside">
-                <li>提交本表单, 获得订单号 (例: SOKEY20260916XXXX)</li>
-                <li>转账时备注订单号, 我们确认到账后开通 API Key</li>
-                <li>Key 会通过你填的邮箱发送给你</li>
+                <li>提交本表单, 获得订单号 + 支付链接</li>
+                <li>跳转到支付宝网页完成支付</li>
+                <li>支付成功后, Key 会通过你填的邮箱发送给你</li>
               </ol>
             </div>
 
@@ -204,7 +206,17 @@ export default function BuyKeyPage() {
               <CheckCircle2 className="w-9 h-9" strokeWidth={2.5} />
             </div>
             <h2 className="text-2xl font-bold text-emerald-800">订单已提交</h2>
-            <p className="mt-2 text-slate-600">我们会尽快确认到账并通过邮箱发送 API Key</p>
+            <p className="mt-2 text-slate-600">点击下方按钮跳转到支付宝完成支付</p>
+
+            {/* 立即支付 CTA */}
+            {payUrl && (
+              <a href={payUrl} target="_blank" rel="noreferrer"
+                className="mt-6 inline-flex items-center justify-center gap-2 w-full bg-gradient-to-br from-primary-500 to-primary-600 text-white font-bold px-8 py-4 rounded-2xl text-lg shadow-glow-primary hover:shadow-lift hover:-translate-y-0.5 transition-all">
+                <CreditCard className="w-6 h-6" />
+                立即支付 ¥{calls}
+                <ExternalLink className="w-5 h-5" />
+              </a>
+            )}
 
             <div className="mt-6 bg-slate-50 border border-slate-200 rounded-xl p-5">
               <div className="text-xs text-slate-500 mb-1">订单号</div>
@@ -228,16 +240,14 @@ export default function BuyKeyPage() {
               </div>
             </div>
 
-            <div className="mt-6 bg-amber-50 border border-amber-200 rounded-xl p-5 text-left text-sm">
-              <div className="font-semibold text-amber-800 mb-2">付款方式</div>
-              <ul className="text-amber-700 space-y-1.5 text-sm">
-                <li><strong>方式 1:</strong> 银行转账到 [待补: 收款账户]</li>
-                <li><strong>方式 2:</strong> 支付宝扫码 [待补: 二维码图]</li>
-                <li><strong>方式 3:</strong> 微信转账 [待补: 收款码]</li>
-              </ul>
-              <div className="mt-3 pt-3 border-t border-amber-200 text-amber-800">
-                <strong>务必在备注里填订单号</strong> — 否则我们对不上账
-              </div>
+            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-5 text-left text-sm text-blue-700">
+              <div className="font-semibold mb-1.5">接下来会发生什么</div>
+              <ol className="space-y-1 list-decimal list-inside">
+                <li>你打开支付宝网页完成支付 (app_id 2021006184625001)</li>
+                <li>支付成功, 我们后台自动对账</li>
+                <li>API Key 会通过 <strong>{form.contact_email}</strong> 发送给你</li>
+                <li>支付问题联系我们: <Link href="/contact" className="underline">contact@gobob.cn</Link></li>
+              </ol>
             </div>
 
             <div className="mt-6 text-sm text-slate-500">

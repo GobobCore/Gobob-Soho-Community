@@ -30,6 +30,8 @@ class Settings(BaseSettings):
 
     # ── Gobob Data API（智能评估 / 院校数据，远程调用）──
     gobob_api_base: str = os.environ.get("GOBOB_API_BASE", "https://api.gobob.cn")
+    # Gobob Payment (18806) — 开源版按次购买走这里
+    gobob_payment_base: str = os.environ.get("GOBOB_PAYMENT_BASE", "http://127.0.0.1:18806")
     gobob_api_key: str = os.environ.get("GOBOB_API_KEY", "")
     # 本地缓存 TTL（秒），避免每次评估都打远程
     gobob_cache_ttl: int = int(os.environ.get("GOBOB_CACHE_TTL", "86400"))  # 24h

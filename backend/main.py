@@ -90,8 +90,10 @@ def startup():
 from api import (  # noqa: E402
     assessment, auth_router, assignments, contracts, dashboard,
     leads, messages, relationships, reports, staff, students, templates, workflow,
+    saas_admin,
 )
 
 for _r in (auth_router, assessment, leads, contracts, assignments, students,
-           workflow, templates, staff, dashboard, messages, relationships, reports):
+           workflow, templates, staff, dashboard, messages, relationships, reports,
+           saas_admin):
     app.include_router(_r.router)

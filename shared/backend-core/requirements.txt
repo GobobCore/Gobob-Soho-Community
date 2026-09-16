@@ -1,0 +1,12 @@
+# 注意：fastapi 0.141 + starlette 1.6 存在 include_router 注册 path=None 的兼容问题，
+# 锁到 0.115.x + starlette <0.46（2026-09 验证可用）。
+fastapi==0.115.6
+starlette>=0.40,<0.46
+uvicorn[standard]>=0.29
+pymysql>=1.1
+python-jose[cryptography]>=3.3
+passlib[bcrypt]>=1.7
+pydantic>=2.6
+pydantic-settings>=2.2
+httpx>=0.27
+

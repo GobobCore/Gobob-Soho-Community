@@ -26,3 +26,17 @@ dist/
 data/
 *.db
 logs/
+
+# Backup
+*_backup_v018*
+*.bak
+*.bak-*
+
+# 不 commit 大文件 (vendor)
+community/portal/node_modules/
+community/portal/.next/
+cloud/portal-saas/node_modules/
+cloud/portal-saas/.next/
+cloud/app-saas/node_modules/
+community/app/node_modules/
+cloud/soho-ops/node_modules/

@@ -2,11 +2,18 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY backend/requirements.txt ./requirements.txt
+# R-Refactor 2026-09-16: 业务核心在 shared/backend-core
+# 开源版 backend 只放 main.py 入口, 实际代码来自 shared
+COPY shared/backend-core/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY backend/ ./
+# 复制 shared 业务核心 (运行时 from main import create_app 用)
+COPY shared/backend-core/ ./shared/backend-core/
 
-EXPOSE 19001
+# 复制 community/backend 入口 (main.py 走 importlib 调 shared 的 main)
+COPY community/backend/ ./community/backend/
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "19001"]
+EXPOSE 19011
+
+# R-Refactor 2026-09-16: 端口 19011 (避开 SaaS 19001), 入口 community/backend/main.py
+CMD ["uvicorn", "community.backend.main:app", "--host", "0.0.0.0", "--port", "19011"]

@@ -1,9 +1,10 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY portal/package.json portal/package-lock.json* ./
+# R-Refactor 2026-09-16: portal 路径变成 community/portal
+COPY community/portal/package.json community/portal/package-lock.json* ./
 RUN npm install --no-audit --no-fund
-COPY portal/ ./
-ARG SOHO_BACKEND_URL=http://backend:19001
+COPY community/portal/ ./
+ARG SOHO_BACKEND_URL=http://backend:19011
 ENV SOHO_BACKEND_URL=$SOHO_BACKEND_URL
 RUN npm run build
 
@@ -11,5 +12,5 @@ FROM node:20-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app ./
-EXPOSE 19002
+EXPOSE 19012
 CMD ["npm", "start"]

@@ -11,9 +11,9 @@ services:
       MYSQL_PASSWORD: ${SOHO_MYSQL_PASS}
     volumes:
       - soho-mysql:/var/lib/mysql
-      # 首次启动自动建表 + 种子
-      - ../backend/sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
-      - ../backend/sql/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+      # 首次启动自动建表 + 种子 (R-Refactor 2026-09-16: schema/seed 在 shared/backend-core)
+      - ../../shared/backend-core/sql/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ../../shared/backend-core/sql/seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
@@ -22,8 +22,8 @@ services:
 
   backend:
     build:
-      context: ..
-      dockerfile: deploy/Dockerfile.backend
+      context: ../..  # R-Refactor 2026-09-16: Dockerfile 路径在 community/deploy, build context 是 repo root
+      dockerfile: community/deploy/Dockerfile.backend
     restart: unless-stopped
     depends_on:
       mysql:
@@ -42,34 +42,34 @@ services:
       GOBOB_API_BASE: ${GOBOB_API_BASE:-https://api.gobob.cn}
       GOBOB_API_KEY: ${GOBOB_API_KEY:-}
     ports:
-      - "${SOHO_BACKEND_PORT:-19001}:19001"
+      - "${SOHO_BACKEND_PORT:-19011}:19011"  # R-Refactor 2026-09-16: 开源版默认 19011 (避开 SaaS 19001)
     volumes:
       - soho-files:/app/data
 
   portal:
     build:
-      context: ..
-      dockerfile: deploy/Dockerfile.portal
+      context: ../..
+      dockerfile: community/deploy/Dockerfile.portal
       args:
-        SOHO_BACKEND_URL: http://backend:19001
+        SOHO_BACKEND_URL: http://backend:19011
     restart: unless-stopped
     depends_on:
       - backend
     ports:
-      - "${SOHO_PORTAL_PORT:-19002}:19002"
+      - "${SOHO_PORTAL_PORT:-19012}:19012"  # 开源版 portal 默认 19012
 
   app:
     build:
-      context: ..
-      dockerfile: deploy/Dockerfile.app
+      context: ../..
+      dockerfile: community/deploy/Dockerfile.app
     restart: unless-stopped
     depends_on:
       - backend
     environment:
-      SOHO_BACKEND: http://backend:19001
-      SOHO_APP_PORT: "19003"
+      SOHO_BACKEND: http://backend:19011
+      SOHO_APP_PORT: "19013"  # 开源版 app 默认 19013
     ports:
-      - "${SOHO_APP_PORT:-19003}:19003"
+      - "${SOHO_APP_PORT:-19013}:19013"
 
 volumes:
   soho-mysql:

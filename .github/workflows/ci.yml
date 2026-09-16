@@ -1,23 +1,89 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 拆分后 (2026-09-16): community/ 是公开版, cloud/ 在 .gitignore
+# CI 只验证 community/ 部分 (shared/ + community/)
+# SaaS 闭源部分在内部 Gitea 单独 CI
+
 jobs:
-  backend:
+  backend-import:
+    name: Backend import + routes
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: |
-          cd backend
+      - name: Install deps
+        run: |
+          cd shared/backend-core
           pip install -r requirements.txt
-          python -c "import main; print('backend import OK, routes:', len(main.app.routes))"
-  portal:
+      - name: Import check (community 入口)
+        run: |
+          python -c "
+          import sys
+          sys.path.insert(0, 'shared/backend-core')
+          sys.path.append('community/backend')
+          from main import create_app
+          app = create_app()
+          print(f'community backend: {len(app.routes)} routes')
+          saas = [r for r in app.routes if '/api/saas' in str(r.path)]
+          print(f'  SaaS routes (应 0): {len(saas)}')
+          assert len(saas) == 0, 'community 版不应有 SaaS 路由'
+          print('✓ community 入口正确')
+          "
+
+  portal-build:
+    name: Portal (Next.js) build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - run: |
-          cd portal
+      - name: Build
+        run: |
+          cd community/portal
           npm install --no-audit --no-fund
           npm run build
+      - name: Verify .next exists
+        run: |
+          test -d community/portal/.next && echo "✓ portal build OK"
+
+  # 业务核心 SQL migration 语法检查
+  sql-syntax:
+    name: SQL syntax
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: test
+          MYSQL_DATABASE: gobob_soho_test
+        ports: [3306:3306]
+        options: --health-cmd="mysqladmin ping" --health-interval=5s --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run schema.sql
+        run: |
+          apt-get install -y default-mysql-client > /dev/null
+          mysql -h 127.0.0.1 -uroot -ptest gobob_soho_test < shared/backend-core/sql/schema.sql
+          mysql -h 127.0.0.1 -uroot -ptest gobob_soho_test < shared/backend-core/sql/seed.sql
+          echo "✓ schema.sql + seed.sql 跑通"
+      - name: Run all migrations (idempotent)
+        run: |
+          for m in shared/backend-core/sql/migrations/*.sql; do
+            echo "  apply $m"
+            mysql -h 127.0.0.1 -uroot -ptest gobob_soho_test < "$m" || { echo "✗ migration failed: $m"; exit 1; }
+          done
+          echo "✓ 所有 migration 幂等可跑"
+      - name: Verify key tables exist
+        run: |
+          mysql -h 127.0.0.1 -uroot -ptest gobob_soho_test -e "
+          SELECT COUNT(*) AS tables FROM information_schema.tables WHERE table_schema='gobob_soho_test';
+          SELECT COUNT(*) AS scopes FROM api_key_scopes;
+          SELECT COUNT(*) AS plans FROM orgs;  -- 至少有 admin/owner default
+          "

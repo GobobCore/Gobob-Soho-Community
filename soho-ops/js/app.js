@@ -11,6 +11,7 @@
       "org-detail-view": V.OrgDetailView,
       "invoices-view": V.InvoicesView,
       "usage-view": V.UsageView,
+      "key-orders-view": V.KeyOrdersView,
     },
     data() {
       return {
@@ -21,6 +22,7 @@
         admin: S.getAdmin() || {},
         nav: [
           { view: "orgs", label: "机构", icon: S.ICONS.orgs },
+          { view: "key-orders", label: "开源版订单", icon: S.ICONS.keyOrders },
           { view: "invoices", label: "账单", icon: S.ICONS.invoices },
           { view: "usage", label: "API 用量", icon: S.ICONS.usage },
         ],
@@ -75,7 +77,7 @@
         if (parts[0] === "org-detail" && parts[1]) {
           this.currentOrgId = parts[1];
           this.currentView = "org-detail";
-        } else if (["orgs", "invoices", "usage"].includes(parts[0])) {
+        } else if (["orgs", "invoices", "usage", "key-orders"].includes(parts[0])) {
           this.currentView = parts[0];
         } else {
           this.currentView = "orgs";
@@ -87,7 +89,7 @@
         if (parts[0] === "org-detail" && parts[1]) {
           this.currentOrgId = parts[1];
           this.currentView = "org-detail";
-        } else if (["orgs", "invoices", "usage"].includes(parts[0])) {
+        } else if (["orgs", "invoices", "usage", "key-orders"].includes(parts[0])) {
           this.currentOrgId = null;
           this.currentView = parts[0];
         }

@@ -405,6 +405,116 @@
   });
 
   // ── 用量总览 ──────────────────────────────────────────────────
+  // ── 开源版按次购买订单 (机构在 portal 提交, 运营在这里开通 Key + 标记收款) ─
+  const KeyOrdersView = defineComponent({
+    components: { Card, Stat },
+    props: ["ctx"],
+    data: () => ({ items: [], summary: {}, loading: true, status: "pending", editId: null, form: {} }),
+    template: `
+    <div>
+      <div class="flex items-center justify-between mb-4">
+        <h1 class="text-xl font-bold">开源版订单</h1>
+        <select v-model="status" @change="load" class="border rounded-lg px-3 py-1.5 text-sm">
+          <option value="">全部</option>
+          <option value="pending">待付款</option>
+          <option value="paid">已付款待交付</option>
+          <option value="delivered">已交付</option>
+          <option value="cancelled">已取消</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <stat label="待付款" :value="summary.pending||0" color="text-amber-600"></stat>
+        <stat label="待收金额" :value="ctx.shared.fmtMoney(summary.pending_amount||0)" color="text-amber-600"></stat>
+        <stat label="已收金额" :value="ctx.shared.fmtMoney(summary.paid_amount||0)" color="text-emerald-600"></stat>
+      </div>
+
+      <card>
+        <div v-if="loading" class="text-sm text-slate-400 py-8 text-center">加载中…</div>
+        <div v-else-if="!items.length" class="text-sm text-slate-400 py-8 text-center">暂无订单</div>
+        <table v-else class="w-full text-sm">
+          <thead><tr class="text-left text-xs text-slate-400 border-b">
+            <th class="pb-2 font-medium">订单号</th>
+            <th class="pb-2 font-medium">机构 / 联系人</th>
+            <th class="pb-2 font-medium text-right">次数</th>
+            <th class="pb-2 font-medium text-right">金额</th>
+            <th class="pb-2 font-medium">状态</th>
+            <th class="pb-2 font-medium">Key</th>
+            <th class="pb-2 font-medium">操作</th>
+          </tr></thead>
+          <tbody>
+            <tr v-for="o in items" :key="o.id" class="border-b last:border-0">
+              <td class="py-3 font-mono text-xs">{{ o.order_no }}</td>
+              <td class="py-3">
+                <div class="font-medium">{{ o.org_name }}</div>
+                <div class="text-xs text-slate-400">{{ o.contact_name }} · {{ o.contact_email }}</div>
+              </td>
+              <td class="text-right">{{ o.calls }}</td>
+              <td class="text-right font-medium">¥{{ o.amount }}</td>
+              <td>
+                <span :class="'badge badge-' + (o.status==='pending' ? 'pending' : o.status==='paid' ? 'trial' : o.status==='delivered' ? 'paid' : 'void')">
+                  {{ ({pending:'待付款', paid:'已付款', delivered:'已交付', cancelled:'已取消'})[o.status] }}
+                </span>
+              </td>
+              <td class="font-mono text-xs text-slate-500">{{ o.api_key_prefix || '—' }}</td>
+              <td class="text-right text-xs">
+                <template v-if="o.status==='pending'">
+                  <button @click="markPaid(o)" class="text-emerald-600 hover:underline">标记已收</button>
+                  <button @click="cancel(o)" class="text-slate-400 hover:underline ml-2">取消</button>
+                </template>
+                <template v-else-if="o.status==='paid'">
+                  <button @click="markDelivered(o)" class="text-primary-600 hover:underline">标记已交付</button>
+                </template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </card>
+      <p class="text-xs text-slate-400 mt-3">
+        流程: 机构在 portal /buy-key 下单 (台账) → 转账备注订单号 → 你点「标记已收」(可同时填 Gobob Key id) → 邮件/微信把 Key 发给机构 → 点「标记已交付」
+      </p>
+    </div>`,
+    async mounted() { this.load(); },
+    methods: {
+      async load() {
+        this.loading = true;
+        try {
+          const d = await S().get("/api/saas/key-orders" + (this.status ? "?status=" + this.status : ""));
+          this.items = d.items; this.summary = d.summary;
+        } catch (e) { this.ctx.toast(e.message, "error"); }
+        this.loading = false;
+      },
+      async markPaid(o) {
+        const keyIdStr = prompt(`已在 Gobob admin-portal /admin/soho-keys 开通了 Key?\n填 Key ID (数字), 或留空只标记已收:`, "");
+        if (keyIdStr === null) return;
+        const keyId = keyIdStr ? parseInt(keyIdStr) : null;
+        const prefix = keyId ? prompt("Key prefix (gob_xxxx..., 用于在订单上展示):", "") : null;
+        const method = prompt("收款方式:", "线下转账");
+        if (method === null) return;
+        try {
+          await S().post(`/api/saas/key-orders/${o.id}/paid`, {
+            api_key_id: keyId, api_key_prefix: prefix, payment_method: method,
+          });
+          this.ctx.toast("已标记收款"); this.load();
+        } catch (e) { this.ctx.toast(e.message, "error"); }
+      },
+      async markDelivered(o) {
+        if (!confirm("已把 Key 发给机构邮箱?")) return;
+        try {
+          await S().post(`/api/saas/key-orders/${o.id}/deliver`, {});
+          this.ctx.toast("已标记交付"); this.load();
+        } catch (e) { this.ctx.toast(e.message, "error"); }
+      },
+      async cancel(o) {
+        if (!confirm("取消该订单?")) return;
+        try {
+          await S().post(`/api/saas/key-orders/${o.id}/cancel`, {});
+          this.ctx.toast("已取消"); this.load();
+        } catch (e) { this.ctx.toast(e.message, "error"); }
+      },
+    },
+  });
+
   const UsageView = defineComponent({
     components: { Card, Stat },
     props: ["ctx"],
@@ -473,5 +583,5 @@
     },
   });
 
-  window.OpsViews = { LoginView, OrgsView, OrgDetailView, InvoicesView, UsageView };
+  window.OpsViews = { LoginView, OrgsView, OrgDetailView, InvoicesView, UsageView, KeyOrdersView };
 })();

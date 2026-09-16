@@ -115,12 +115,30 @@ def register_org(req: RegisterReq):
             (org_id,),
         )
         stages_copied = cur.rowcount
-        # 注: lead_pipeline_stages 主键只有 stage_id, 全机构共享 7 行 — 这是个 schema bug
-        # (应 (stage_id, org_id) 联合主键, 还没修). 所以这里不能复制, 不然新机构会覆盖 e2822fa32fb94989.
-        # 折中: 不复制, 后续让新机构在 app 的「设置」里手动建 pipeline.
-        # 等 PM 改 schema bug 后 (改 PK 为 (stage_id, org_id)), 再补这部分逻辑.
-        stages_copied = 0
-    log.info("new org registered: id=%s name=%s owner=%s (pipeline 待 PM 修 schema bug)", org_id, req.org_name, req.owner_name)
+        # 复制 pipeline stages 到新机构 (R-Fix 2026-09-16 v0.18.0: PK 已改 (stage_id, org_id) 联合, 可安全复制)
+        # 从任一已有机构复制 (优先 plan_status=paid, 其次任一非 suspended)
+        cur.execute(
+            """SELECT org_id FROM lead_pipeline_stages s
+               JOIN orgs o ON o.id = s.org_id
+               WHERE o.plan_status != 'suspended' AND s.org_id != %s
+               GROUP BY s.org_id
+               ORDER BY (o.plan_status = 'paid') DESC, o.created_at ASC
+               LIMIT 1""",
+            (org_id,),
+        )
+        tpl = cur.fetchone()
+        if tpl:
+            cur.execute(
+                "INSERT INTO lead_pipeline_stages (stage_id, org_id, name, sort_order, is_start, is_won, is_lost, max_days) "
+                "SELECT stage_id, %s, name, sort_order, is_start, is_won, is_lost, max_days "
+                "FROM lead_pipeline_stages WHERE org_id=%s",
+                (org_id, tpl["org_id"]),
+            )
+            stages_copied = cur.rowcount
+        else:
+            stages_copied = 0
+    log.info("new org registered: id=%s name=%s owner=%s stages=%d (tpl=%s)",
+             org_id, req.org_name, req.owner_name, stages_copied, tpl["org_id"] if tpl else "none")
     # 自动登录
     token = auth.create_token(acc_id, req.username, auth.ROLE_OWNER, org_id)
     return {

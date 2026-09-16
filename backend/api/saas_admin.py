@@ -374,3 +374,178 @@ def usage_overview(
     for it in items:
         it["last_date"] = str(it["last_date"]) if it.get("last_date") else None
     return {"days": days, "by_org": items, "by_endpoint": by_endpoint}
+
+
+# ── 开源版按次购买 (公开, 无需登录) ─────────────────────────────
+# 机构自助下单买 Gobob Data API 调用次数, 台账模式:
+#   1. 机构填表 → 创建 org + api_key (remaining_calls=0, 未激活) + topup 待收
+#   2. 机构转账 (alipay/wechat/转账) 附订单号
+#   3. 运营在 Gobob admin-portal 点「标记已收」→ Key 激活
+# 注: api_keys 表在 Gobob 主库, 通过 Gobob 后端调 (gobob_client 不能用, 这是 SOHO 后端逻辑)
+# 简化方案: SOHO 不直接创建 Gobob Key, 只记申请单, 运营在 admin 后台手动开 Key + 充次数
+
+class BuyKeyReq(BaseModel):
+    org_name: str = Field(..., min_length=2, max_length=100, description="机构名")
+    contact_email: str = Field(..., description="联系邮箱 (收 Key 用)")
+    contact_phone: str | None = None
+    contact_name: str = Field(..., min_length=1, max_length=50)
+    calls: int = Field(..., ge=10, le=10000, description="购买次数 (¥1/次, 最低 10)")
+    note: str | None = None
+
+
+# 公开申请表 (saas_key_orders 表, 运营在 admin 后台看 + 手动开 Key 充值)
+# 先建表 (在 saas_admin.py 里 IF NOT EXISTS, 避免新写 migration)
+def _ensure_key_orders_table(cur):
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS saas_key_orders (
+          id            VARCHAR(64) PRIMARY KEY,
+          order_no      VARCHAR(50) NOT NULL UNIQUE COMMENT 'SO-xxx 可读单号',
+          org_name      VARCHAR(100) NOT NULL,
+          contact_name  VARCHAR(50) NOT NULL,
+          contact_email VARCHAR(200) NOT NULL,
+          contact_phone VARCHAR(50) DEFAULT NULL,
+          calls         INT NOT NULL,
+          amount        DECIMAL(10,2) NOT NULL COMMENT '应付 ¥ (= calls, ¥1/次)',
+          status        ENUM('pending','paid','delivered','cancelled') NOT NULL DEFAULT 'pending',
+          api_key_id    BIGINT DEFAULT NULL COMMENT '开通后的 Gobob api_keys.id',
+          api_key_prefix VARCHAR(16) DEFAULT NULL COMMENT '开通后展示给机构',
+          paid_at       DATETIME DEFAULT NULL,
+          delivered_at  DATETIME DEFAULT NULL,
+          note          VARCHAR(500) DEFAULT NULL,
+          created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_status (status),
+          INDEX idx_email (contact_email)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    """)
+
+
+@router.post("/buy-key")
+def buy_key(req: BuyKeyReq):
+    """公开: 机构申请购买 Gobob Data API 次数 (开源版).
+
+    无需登录. 提交后:
+    - 创建 saas_key_orders 记录 (status=pending)
+    - 返回 order_no + 收款账户提示
+    - 运营在 Gobob admin-portal /admin/soho-keys 里看到, 开通 Key + 标记已收
+    """
+    with db_cursor() as cur:
+        _ensure_key_orders_table(cur)
+        oid = new_id()
+        order_no = new_order_no("SOKEY")
+        amount = float(req.calls)  # ¥1/次
+        cur.execute(
+            """INSERT INTO saas_key_orders
+               (id, order_no, org_name, contact_name, contact_email, contact_phone, calls, amount, note)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (oid, order_no, req.org_name, req.contact_name, req.contact_email,
+             req.contact_phone, req.calls, amount, req.note),
+        )
+    log.info("buy-key order: %s %s (%s calls ¥%s) by %s <%s>",
+             order_no, req.org_name, req.calls, amount, req.contact_name, req.contact_email)
+    return {
+        "ok": True,
+        "order_no": order_no,
+        "amount": amount,
+        "calls": req.calls,
+        "payment_hint": "请线下转账或扫码支付后, 在备注里填订单号. 我们确认到账后会通过邮箱发送 API Key.",
+    }
+
+
+@router.get("/buy-key/{order_no}")
+def check_order(order_no: str):
+    """公开: 用订单号查状态 (机构知道自己 Key 开通了没)."""
+    with db_cursor() as cur:
+        _ensure_key_orders_table(cur)
+        cur.execute(
+            "SELECT order_no, org_name, calls, amount, status, api_key_prefix, paid_at, delivered_at, created_at "
+            "FROM saas_key_orders WHERE order_no=%s",
+            (order_no,),
+        )
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="订单号不存在")
+        for f in ("paid_at", "delivered_at", "created_at"):
+            if row.get(f):
+                row[f] = str(row[f])
+        row["amount"] = float(row["amount"])
+        return row
+
+
+# ── 运营后台看 buy-key 申请单 ────────────────────────────────────
+
+@router.get("/key-orders")
+def list_key_orders(
+    admin: dict = Depends(get_ops_admin),
+    status: str | None = Query(None),
+):
+    """运营后台: 列所有 buy-key 申请."""
+    with db_cursor() as cur:
+        _ensure_key_orders_table(cur)
+        where = "WHERE status = %s" if status else ""
+        params = (status,) if status else ()
+        cur.execute(
+            f"SELECT * FROM saas_key_orders {where} ORDER BY created_at DESC LIMIT 200",
+            params,
+        )
+        items = [dict(r) for r in cur.fetchall()]
+    for it in items:
+        for f in ("paid_at", "delivered_at", "created_at", "updated_at"):
+            if it.get(f):
+                it[f] = str(it[f])
+        it["amount"] = float(it["amount"])
+    summary = {
+        "pending": sum(1 for i in items if i["status"] == "pending"),
+        "pending_amount": sum(i["amount"] for i in items if i["status"] == "pending"),
+        "paid_amount": sum(i["amount"] for i in items if i["status"] == "paid"),
+    }
+    return {"summary": summary, "items": items}
+
+
+class MarkPaidReq(BaseModel):
+    api_key_id: int | None = None  # 运营已在 Gobob admin-portal 开通了 Key, 填 id
+    api_key_prefix: str | None = None
+    payment_method: str | None = None
+
+
+@router.post("/key-orders/{order_id}/paid")
+def mark_order_paid(order_id: str, req: MarkPaidReq, admin: dict = Depends(get_ops_admin)):
+    """标记订单已收 + 关联已开通的 Key. 机构端能看到 status=paid."""
+    with db_cursor() as cur:
+        _ensure_key_orders_table(cur)
+        cur.execute(
+            "UPDATE saas_key_orders SET status='paid', paid_at=NOW(), api_key_id=%s, api_key_prefix=%s, note=CONCAT(COALESCE(note,''),' pay:',COALESCE(%s,'')) WHERE id=%s AND status='pending'",
+            (req.api_key_id, req.api_key_prefix, req.payment_method, order_id),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=400, detail="订单不存在或已处理")
+    log.info("ops %s marked key-order %s paid (key %s)", admin["username"], order_id, req.api_key_prefix)
+    return {"ok": True}
+
+
+@router.post("/key-orders/{order_id}/deliver")
+def mark_order_delivered(order_id: str, admin: dict = Depends(get_ops_admin)):
+    """标记已交付 (Key 已发给机构邮箱)."""
+    with db_cursor() as cur:
+        _ensure_key_orders_table(cur)
+        cur.execute(
+            "UPDATE saas_key_orders SET status='delivered', delivered_at=NOW() WHERE id=%s AND status='paid'",
+            (order_id,),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=400, detail="订单状态不对")
+    return {"ok": True}
+
+
+@router.post("/key-orders/{order_id}/cancel")
+def cancel_order(order_id: str, admin: dict = Depends(get_ops_admin)):
+    """取消订单 (机构没付钱/退款)."""
+    with db_cursor() as cur:
+        _ensure_key_orders_table(cur)
+        cur.execute(
+            "UPDATE saas_key_orders SET status='cancelled' WHERE id=%s AND status='pending'",
+            (order_id,),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=400, detail="订单状态不对")
+    return {"ok": True}

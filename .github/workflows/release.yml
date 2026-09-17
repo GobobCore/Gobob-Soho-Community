@@ -58,16 +58,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Configure git + HTTPS remotes
-        env:
-          SOHO_GITHUB_TOKEN: ${{ secrets.SOHO_GITHUB_TOKEN }}
+      - name: Configure git + HTTPS remotes (PAT 用 ${{ }} 直接替换, 避免 env var 重名)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          # origin 改成 HTTPS + PAT
-          git remote set-url origin "https://x-access-token:${SOHO_GITHUB_TOKEN}@github.com/GobobCore/Gobob-SOHO.git"
-          git remote add audit-community "https://x-access-token:${SOHO_GITHUB_TOKEN}@github.com/GobobCore/Gobob-Soho-Community.git"
-          git remote add audit-saas "https://x-access-token:${SOHO_GITHUB_TOKEN}@github.com/GobobCore/Gobob-Soho-SaaS.git"
+          # 用 ${{ secrets.SOHO_GITHUB_TOKEN }} 在 workflow 文本里直接展开
+          # 注意: 不要写成 \${{ }} env var (GitHub 自动注入 GITHUB_TOKEN 会冲突)
+          git remote set-url origin "https://x-access-token:${{ secrets.SOHO_GITHUB_TOKEN }}@github.com/GobobCore/Gobob-SOHO.git"
+          git remote add audit-community "https://x-access-token:${{ secrets.SOHO_GITHUB_TOKEN }}@github.com/GobobCore/Gobob-Soho-Community.git"
+          git remote add audit-saas "https://x-access-token:${{ secrets.SOHO_GITHUB_TOKEN }}@github.com/GobobCore/Gobob-Soho-SaaS.git"
           git fetch audit-community main
           git fetch audit-saas main
 

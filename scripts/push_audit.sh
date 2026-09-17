@@ -131,19 +131,17 @@ if [[ -n "$SKIP_FETCH" ]]; then
     echo "  (--skip-fetch, 跳过远端检查)"
 else
     echo "  拉取远端 main HEAD..."
-    # 每个 target 用独立 remote alias, 避免 FETCH_HEAD 引用混淆
+    # CI runner: remote 由 workflow pre-fetch step 加好, 这里直接读 refs/remotes/...
+    # 本地/CI 一致: refs/remotes/audit-${TARGET}/main
     REMOTE_ALIAS="audit-${TARGET}"
-    # 如果 remote 已存在(可能上次没清理干净), 先 remove 再 add
-    git remote remove "$REMOTE_ALIAS" 2>/dev/null || true
-    git remote add "$REMOTE_ALIAS" "$REMOTE_REPO"
-    echo "  git fetch $REMOTE_ALIAS main ..."
-    FETCH_OUTPUT=$(git fetch "$REMOTE_ALIAS" main 2>&1)
-    FETCH_EXIT=$?
-    echo "$FETCH_OUTPUT" | tail -3
-    if [[ $FETCH_EXIT -ne 0 ]]; then
-        error "git fetch 失败 (exit=$FETCH_EXIT), 无法继续远端审计"
-        git remote remove "$REMOTE_ALIAS" 2>/dev/null
-        return 2>/dev/null || exit 1
+    if ! git remote get-url "$REMOTE_ALIAS" >/dev/null 2>&1; then
+        # 本地直接调用 audit script 的场景 (workflow 没跑过 pre-fetch)
+        git remote add "$REMOTE_ALIAS" "$REMOTE_REPO"
+        echo "  git fetch $REMOTE_ALIAS main ..."
+        if ! git fetch "$REMOTE_ALIAS" main 2>&1 | tail -3; then
+            error "git fetch 失败, 无法继续远端审计"
+            exit 1
+        fi
     fi
 
     # 远端不能含 EXCLUDED_PATTERN

@@ -71,6 +71,14 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin git@github.com:GobobCore/Gobob-SOHO.git
 
+      - name: Pre-fetch all remotes
+        run: |
+          # 预先 fetch 3 个仓 (用 SSH key 一次, 后续 audit 直接读本地 refs)
+          git remote add audit-community git@github.com:GobobCore/Gobob-Soho-Community.git
+          git remote add audit-saas git@github.com:GobobCore/Gobob-Soho-SaaS.git
+          git fetch audit-community main
+          git fetch audit-saas main
+
       # Audit community release
       - name: Audit for community release
         run: |

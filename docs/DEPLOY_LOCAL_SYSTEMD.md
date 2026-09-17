@@ -2,8 +2,10 @@
 
 > **适用场景**: 开发者本机 / 内部测试机, 不想起 docker 容器
 > **当前环境**: gobob 主仓同机 (192.168.1.5), 3 个 systemd --user service
+>
+> ⚠️ **R-Refactor (2026-09-16) 仓库拆分后**: 端口改 **19011/19012/19013**(避开 SaaS 19001/19002/19003),后端入口 `community.backend.main:app`,前端在 `community/portal` `community/app`,SQL 在 `shared/backend-core/sql/`。
 
-跟 `DEPLOY.md` 的 docker 方式并行, 这份文档记录**本机 19001/19002/19003 直接由 systemd 管理**的实际部署经验。
+跟 [DEPLOY.md](DEPLOY.md) 的 docker 方式并行,这份文档记录**本机 19011/19012/19013 直接由 systemd 管理**的实际部署经验。
 
 ---
 
@@ -13,9 +15,9 @@
 ┌────────────────────────────────────────────────────────┐
 │  systemd --user (linger=yes, 开机自起)                  │
 │                                                         │
-│  gobob-soho-backend.service   19001   FastAPI           │
-│  gobob-soho-portal.service    19002   Next.js 14        │
-│  gobob-soho-app.service       19003   Vue 3 SPA + proxy │
+│  gobob-soho-backend.service   19011   FastAPI           │
+│  gobob-soho-portal.service    19012   Next.js 14        │
+│  gobob-soho-app.service       19013   Vue 3 SPA + proxy │
 └────────────────────────────────────────────────────────┘
          │                    │                  │
          └────────────────────┴──────────────────┘
@@ -35,25 +37,28 @@
 ~/.config/systemd/user/gobob-soho-app.service
 
 ~/.openclaw/workspace/gobob-soho/
-├── backend/   (FastAPI, uvicorn 跑在 /tmp/soho-venv)
-├── portal/    (Next.js, npm start, node_modules 已装)
-└── app/       (Vue 3 SPA, python3 serve.py)
+├── shared/backend-core/         (FastAPI 业务核心)
+│   └── main.py                  (uvicorn community.backend.main:app 等价入口)
+├── community/
+│   ├── backend/main.py          (开源版后端入口 — 实际 uvicorn 启动点)
+│   ├── portal/                  (Next.js, npm start, node_modules 已装)
+│   └── app/                     (Vue 3 SPA, python3 serve.py)
 ```
 
 ---
 
-## 一、backend (19001)
+## 一、backend (19011)
 
 `gobob-soho-backend.service`:
 
 ```ini
 [Unit]
-Description=Gobob SOHO backend (FastAPI)
+Description=Gobob SOHO community backend (FastAPI)
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/home/ricky/.openclaw/workspace/gobob-soho/backend
+WorkingDirectory=/home/ricky/.openclaw/workspace/gobob-soho
 Environment="SOHO_MYSQL_HOST=127.0.0.1"
 Environment="SOHO_MYSQL_USER=soho"
 Environment="SOHO_MYSQL_PASS=SohoTest#2026x"
@@ -64,7 +69,7 @@ Environment="SOHO_ADMIN_PASSWORD=Admin#2026x"
 Environment="SOHO_ORG_NAME=E2E测试留学工作室"
 Environment="GOBOB_API_BASE=http://127.0.0.1:18797"
 Environment="GOBOB_API_KEY=gob_xxx"  # 用 Gobob 主仓创建的 SMB Key
-ExecStart=/tmp/soho-venv/bin/uvicorn main:app --host 0.0.0.0 --port 19001
+ExecStart=/tmp/soho-venv/bin/uvicorn community.backend.main:app --host 0.0.0.0 --port 19011
 Restart=always
 RestartSec=3
 
@@ -75,10 +80,10 @@ WantedBy=default.target
 **首次准备**:
 
 ```bash
-# 1. venv
+# 1. venv (repo 根)
 python3 -m venv /tmp/soho-venv
 source /tmp/soho-venv/bin/activate
-pip install -r ~/.openclaw/workspace/gobob-soho/backend/requirements.txt
+pip install -r ~/.openclaw/workspace/gobob-soho/shared/backend-core/requirements.txt
 
 # 2. MySQL 库 + 用户 (用本机 root 跑一次)
 mysql -uroot -p <<'SQL'
@@ -88,9 +93,9 @@ GRANT ALL PRIVILEGES ON gobob_soho.* TO 'soho'@'localhost';
 FLUSH PRIVILEGES;
 SQL
 
-# 3. 建表 + 种子
-mysql -usoho -pSohoTest#2026x gobob_soho < ~/.openclaw/workspace/gobob-soho/backend/sql/schema.sql
-mysql -usoho -pSohoTest#2026x gobob_soho < ~/.openclaw/workspace/gobob-soho/backend/sql/seed.sql
+# 3. 建表 + 种子 (R-Refactor 2026-09-16: SQL 在 shared/backend-core/sql/)
+mysql -usoho -pSohoTest#2026x gobob_soho < ~/.openclaw/workspace/gobob-soho/shared/backend-core/sql/schema.sql
+mysql -usoho -pSohoTest#2026x gobob_soho < ~/.openclaw/workspace/gobob-soho/shared/backend-core/sql/seed.sql
 
 # 4. 起服务
 systemctl --user daemon-reload
@@ -100,26 +105,26 @@ systemctl --user enable --now gobob-soho-backend
 **验证**:
 
 ```bash
-curl http://127.0.0.1:19001/api/health
+curl http://127.0.0.1:19011/api/health
 # {"ok":true,"service":"gobob-soho","db":"up","gobob_data_api":"configured"}
 ```
 
 ---
 
-## 二、portal (19002)
+## 二、portal (19012)
 
 `gobob-soho-portal.service`:
 
 ```ini
 [Unit]
-Description=Gobob SOHO portal frontend (Next.js assessment lead-gen)
+Description=Gobob SOHO community portal frontend (Next.js assessment lead-gen)
 After=network.target gobob-soho-backend.service
 
 [Service]
 Type=simple
-WorkingDirectory=/home/ricky/.openclaw/workspace/gobob-soho/portal
-Environment="SOHO_BACKEND_URL=http://127.0.0.1:19001"
-Environment="PORT=19002"
+WorkingDirectory=/home/ricky/.openclaw/workspace/gobob-soho/community/portal
+Environment="SOHO_BACKEND_URL=http://127.0.0.1:19011"
+Environment="PORT=19012"
 Environment="NODE_ENV=production"
 ExecStart=/usr/bin/npm start
 Restart=always
@@ -132,7 +137,7 @@ WantedBy=default.target
 **首次准备**:
 
 ```bash
-cd ~/.openclaw/workspace/gobob-soho/portal
+cd ~/.openclaw/workspace/gobob-soho/community/portal
 npm install
 npm run build  # 生成 .next/
 
@@ -143,27 +148,27 @@ systemctl --user enable --now gobob-soho-portal
 **验证**:
 
 ```bash
-curl -I http://127.0.0.1:19002/             # HTTP 200
-curl -I http://127.0.0.1:19002/assessment   # HTTP 200
-curl http://127.0.0.1:19002/api/assessment/meta | head -c 200  # 反代 backend 通
+curl -I http://127.0.0.1:19012/             # HTTP 200
+curl -I http://127.0.0.1:19012/assessment   # HTTP 200
+curl http://127.0.0.1:19012/api/assessment/meta | head -c 200  # 反代 backend 通
 ```
 
 ---
 
-## 三、app (19003)
+## 三、app (19013)
 
 `gobob-soho-app.service`:
 
 ```ini
 [Unit]
-Description=Gobob SOHO service platform frontend (Vue3 SPA + proxy)
+Description=Gobob SOHO community service platform frontend (Vue3 SPA + proxy)
 After=network.target gobob-soho-backend.service
 
 [Service]
 Type=simple
-WorkingDirectory=/home/ricky/.openclaw/workspace/gobob-soho/app
-Environment="SOHO_BACKEND=http://127.0.0.1:19001"
-Environment="SOHO_APP_PORT=19003"
+WorkingDirectory=/home/ricky/.openclaw/workspace/gobob-soho/community/app
+Environment="SOHO_BACKEND=http://127.0.0.1:19011"
+Environment="SOHO_APP_PORT=19013"
 ExecStart=/usr/bin/python3 serve.py
 Restart=always
 RestartSec=3
@@ -183,8 +188,8 @@ systemctl --user enable --now gobob-soho-app
 **验证**:
 
 ```bash
-curl -I http://127.0.0.1:19003/          # HTTP 200
-curl http://127.0.0.1:19003/api/health   # 反代 backend 通
+curl -I http://127.0.0.1:19013/          # HTTP 200
+curl http://127.0.0.1:19013/api/health   # 反代 backend 通
 ```
 
 ---
@@ -213,9 +218,9 @@ systemctl --user stop gobob-soho-portal
 
 ## 默认账号
 
-- **服务平台 (19003)**: admin / Admin#2026x (见 backend service env `SOHO_ADMIN_*`)
+- **服务平台 (19013)**: admin / Admin#2026x (见 backend service env `SOHO_ADMIN_*`)
 - **机构**: E2E测试留学工作室
-- **获客门户 (19002)**: 匿名可用, 留资自动进 leads
+- **获客门户 (19012)**: 匿名可用, 留资自动进 leads
 
 ---
 
@@ -226,7 +231,7 @@ systemctl --user stop gobob-soho-portal
 | Gobob backend 18797 `/api/smb/v1/*` | 智能评估 / 院校数据 | 仅评估和院校下拉不可用, 核心业务不影响 |
 | 本机 MySQL 3306 | gobob_soho 库 | 全站挂 |
 
-**Gobob 侧 SMB Key 管理**: 用 Gobob admin token 调 `POST /api/api-keys` 创建, 写进 `GOBOB_API_KEY` env。当前生产 Key: id=39 `Gobob-SOHO-本机部署`。
+**Gobob 侧 SMB Key 管理**: 用 Gobob admin token 调 `POST /api/api-keys` 创建, scope 用 `smb:*`,写进 `GOBOB_API_KEY` env。当前生产 Key: id=39 `Gobob-SOHO-本机部署`。
 
 ---
 
@@ -236,10 +241,24 @@ systemctl --user stop gobob-soho-portal
 |---|---|---|
 | 隔离 | 容器 | 进程级 |
 | MySQL | 独立容器 | 共用本机 3306 |
-| 端口冲突 | 无 | 要避开 gobob 全家桶 18797-18807 |
+| 端口冲突 | 无 | 要避开 gobob 全家桶 18797-18807 + SaaS 1900x |
 | 备份 | volume 单独 | 跟本机 mysql 一起 mysqldump |
 | 升级 | docker pull + rebuild | git pull + restart |
 
 ---
 
-**Last updated**: 2026-09-16 (cecilia, 跟着实际部署过程写)
+## 跟 SaaS 版 (cloud/) 的区别
+
+| 维度 | community/ (本文) | cloud/ |
+|---|---|---|
+| 多机构 | ❌ 单 org | ✅ 多 org, orgs.slug 路由分流 |
+| 计费 | 按次购买 Key (调 Gobob payment) | 订阅 + 账单流水 + 自助注册 |
+| 入口 | `uvicorn community.backend.main:app` | `uvicorn cloud.backend_saas.main:app` |
+| 端口 | 19011/19012/19013 | 19001/19002/19003 |
+| 部署位置 | GitHub 公开 | 本地 Gitea + .gitignore 隔离 |
+
+详见 [SPLIT_PLAN_SAAS_VS_COMMUNITY_2026-09-16.md](SPLIT_PLAN_SAAS_VS_COMMUNITY_2026-09-16.md)。
+
+---
+
+**Last updated**: 2026-09-17 (cecilia, 对齐 shared/community/cloud 三层重构 + 19011/19012/19013)

@@ -20,10 +20,27 @@
 | **后端入口** | `saas/backend/main.py` (自带 saas_admin + billing router) | `community/backend/main.py` (只用 shared 核心) |
 | **平台前端** | `saas/app/index.html` (brand: "SaaS 多机构版") | `community/app/index.html` (brand: "社区开源自托管版") |
 | **运营后台** | `saas/soho-ops/index.html` | — (社区版无运营后台,本机 owner 角色自管) |
-| **获客 portal** | 暂共用 `community/portal` (19002,Next.js) | `community/portal` (19012,Next.js) |
+| **获客 portal** | `saas/portal/` (19002, Next.js) | `community/portal/` (19012, Next.js) |
 | **DB** | `gobob_soho` (多机构 + 计费表) | `gobob_soho_community` (单机构) |
-| **systemd** | `gobob-soho-{backend,app,ops}.service` → `saas/` | `gobob-soho-community-{backend,app,portal}.service` → `community/` |
+| **systemd** | `gobob-soho-{backend,app,ops,portal}.service` → `saas/` | `gobob-soho-community-{backend,app,portal}.service` → `community/` |
 | **共用** | `shared/backend-core/` (业务核心, 两版都必须相同) | 同左 |
+
+### Portal 数据流(SaaS vs 社区版)
+
+| 维度 | SaaS portal (19002) | 社区版 portal (19012) |
+|------|---------------------|----------------------|
+| Next.js 工作目录 | `saas/portal/` | `community/portal/` |
+| 反代目标 BACKEND | `http://127.0.0.1:19001` (SaaS backend) | `http://127.0.0.1:19011` (社区版 backend) |
+| 反代路径 | `/api/assessment/*`, `/api/leads/*`, `/api/register`, `/api/saas/*` | `/api/assessment/*`, `/api/leads/*` |
+| 数据流向 | 留资 → SaaS backend `gobob_soho` (走多机构路由 `?org=slug`) | 留资 → 社区 backend `gobob_soho_community` (单一机构, 跟社区 app 同 backend 同库) |
+| 自助注册 | ✅ SaaS 多机构 (`/api/register`) | ❌ 社区单机构 (无注册,机构手动建账号) |
+| 收银台 | ✅ `/api/saas/*` (开源版按次购买,SaaS 收银台代理 Gobob payment) | ❌ 社区自托管无 SaaS 收银台 |
+
+**绝不共用**:
+- `saas/portal/` ≠ `community/portal/` (独立两份代码,各自配 BACKEND)
+- `saas/app/` ≠ `community/app/`(独立两份,品牌/文案不同)
+- `saas/backend/api/{saas_admin,billing}.py` ≠ 任何 community 文件
+- systemd unit 配置文件 (`~/.config/systemd/user/gobob-soho*.service`) 一一对应 saas 或 community,**不允许混用**
 
 **绝不共用**:
 - `saas/app/` ≠ `community/app/`(独立两份,品牌/文案不同)

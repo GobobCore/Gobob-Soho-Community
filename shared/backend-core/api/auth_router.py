@@ -68,6 +68,53 @@ def me(user: dict = Depends(auth.get_current_user)):
     }
 
 
+# ── 修改自己密码 (任何登录用户) ─────────────────────────────────
+class ChangePasswordReq(BaseModel):
+    old_password: str = Field(..., min_length=1, description="当前密码")
+    new_password: str = Field(..., min_length=8, max_length=64, description="新密码 (≥ 8 位)")
+
+
+@router.post("/change-password")
+def change_password(req: ChangePasswordReq, user: dict = Depends(auth.get_current_user)):
+    """修改当前登录用户的密码. 需提供旧密码验证. 成功后其他登录 token 仍有效 (不撤销)."""
+    with db_cursor() as cur:
+        cur.execute("SELECT password_hash FROM accounts WHERE id=%s", (user["sub"],))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="账号不存在")
+        if not auth.verify_password(req.old_password, row["password_hash"]):
+            raise HTTPException(status_code=401, detail="旧密码错误")
+        new_hash = auth.hash_password(req.new_password)
+        cur.execute("UPDATE accounts SET password_hash=%s WHERE id=%s",
+                    (new_hash, user["sub"]))
+    log.info("password changed for user %s (org=%s)", user["username"], user["org_id"])
+    return {"changed": True}
+
+
+# ── 修改自己个人资料 (任何登录用户) ──────────────────────────────
+class ProfileUpdateReq(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=100, description="姓名")
+    phone: str | None = Field(None, max_length=50, description="个人手机")
+    email: str | None = Field(None, max_length=100, description="个人邮箱")
+    wechat: str | None = Field(None, max_length=100, description="微信号")
+
+
+@router.patch("/profile")
+def update_profile(req: ProfileUpdateReq, user: dict = Depends(auth.get_current_user)):
+    """修改当前登录用户的个人资料 (members 表). PATCH 语义 — None 字段不改."""
+    mid = user.get("member_id")
+    if not mid:
+        raise HTTPException(status_code=400, detail="当前账号未关联成员, 无法修改个人资料")
+    fields = {k: v for k, v in req.model_dump().items() if v is not None}
+    if not fields:
+        return {"updated": 0}
+    set_clauses = ", ".join(f"{k}=%s" for k in fields.keys())
+    params = list(fields.values()) + [mid]
+    with db_cursor() as cur:
+        cur.execute(f"UPDATE members SET {set_clauses} WHERE id=%s", params)
+    return {"updated": len(fields)}
+
+
 # ── 机构自助注册 (公开) ─────────────────────────────────────────
 
 class RegisterReq(BaseModel):

@@ -151,6 +151,14 @@
       // hash 路由恢复
       const h = location.hash.replace(/^#\//, "");
       if (this.loggedIn) {
+        // R-Fix 2026-09-17 18:10: 如果 hash 是 #/login (用户主动登出或访问根 #/login) 但本地有 token, 清 token 重置为未登录态.
+        if (h === "login" || h === "register") {
+          S.clearAuth();
+          this.loggedIn = false;
+          this.user = {};
+          this.authView = (h === "register") ? "register" : "login";
+          return;
+        }
         this.user = S.getUser() || {};
         this.loadMyStudents();  // Phase 5
         const allowed = this.navGroups.flatMap(g => g.items.map(i => i.view));
@@ -163,6 +171,16 @@
       window.addEventListener("hashchange", () => {
         const v = location.hash.replace(/^#\//, "");
         if (this.loggedIn) {
+          // 用户点登出 (hash=#/login) 或访问 register, 清 token
+          if (v === "login" || v === "register") {
+            S.clearAuth();
+            this.loggedIn = false;
+            this.user = {};
+            this.myStudents = [];
+            this.currentView = "";
+            this.authView = (v === "register") ? "register" : "login";
+            return;
+          }
           const allowed = this.navGroups.flatMap(g => g.items.map(i => i.view));
           if (allowed.includes(v)) this.currentView = v;
         } else if (v === "register") {

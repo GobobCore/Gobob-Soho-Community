@@ -114,11 +114,11 @@ def create_app() -> FastAPI:
     # ── 业务核心路由挂载 ──
     from api import (  # noqa: E402
         assessment, auth_router, assignments, contracts, dashboard,
-        leads, messages, relationships, reports, staff, students, templates, workflow,
+        leads, messages, orgs_me, relationships, reports, staff, students, templates, workflow,
     )
 
     for _r in (auth_router, assessment, leads, contracts, assignments, students,
-               workflow, templates, staff, dashboard, messages, relationships, reports):
+               workflow, templates, staff, dashboard, messages, orgs_me, relationships, reports):
         app.include_router(_r.router)
 
     return app

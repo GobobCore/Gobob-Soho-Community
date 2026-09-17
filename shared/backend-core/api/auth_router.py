@@ -79,6 +79,11 @@ class RegisterReq(BaseModel):
     owner_name: str = Field(..., min_length=1, max_length=50, description="老板/主管姓名")
     contact_phone: str | None = Field(None, max_length=50)
     contact_email: str | None = Field(None, max_length=200)
+    # R-Refactor 2026-09-17: SaaS 设置页 — 注册可选填机构信息 (description/address/website/logo_url)
+    description: str | None = Field(None, max_length=2000, description="机构简介")
+    address: str | None = Field(None, max_length=500, description="商务地址")
+    website: str | None = Field(None, max_length=500, description="官方网站 URL")
+    logo_url: str | None = Field(None, max_length=500, description="机构 logo URL")
 
 
 @router.post("/register")
@@ -101,8 +106,12 @@ def register_org(req: RegisterReq):
         # 创建
         org_id = new_id()
         cur.execute(
-            "INSERT INTO orgs (id, name, slug, contact_phone, contact_email, contact_name) VALUES (%s, %s, %s, %s, %s, %s)",
-            (org_id, req.org_name, req.org_slug, req.contact_phone, req.contact_email, req.owner_name),
+            """INSERT INTO orgs (id, name, slug, address, email, website, logo_url, description,
+                                  contact_phone, contact_email, contact_name)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (org_id, req.org_name, req.org_slug, req.address, req.contact_email,
+             req.website, req.logo_url, req.description,
+             req.contact_phone, req.contact_email, req.owner_name),
         )
         acc_id = new_id()
         cur.execute(

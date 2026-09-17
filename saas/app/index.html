@@ -69,10 +69,8 @@
       <!-- 侧边栏 -->
       <aside class="w-56 bg-white border-r border-slate-200 flex flex-col fixed inset-y-0 shadow-sm">
         <div class="h-14 flex items-center gap-2.5 px-4 border-b border-slate-200">
-          <!-- R-Refactor 2026-09-17: sidebar logo 改远程 OSS URL, 去掉右侧品牌文案 -->
-          <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-[#E08A44] to-[#C97636] flex items-center justify-center shadow-[0_4px_12px_rgba(224,138,68,0.32)]">
-            <img src="https://gobob-img.oss-cn-beijing.aliyuncs.com/static/img/gobob_logo_en.svg" class="w-5 h-5 brightness-0 invert" />
-          </div>
+          <!-- R-Refactor 2026-09-17: sidebar 直接显示远程 logo, 无外层样式 -->
+          <img src="https://gobob-img.oss-cn-beijing.aliyuncs.com/static/img/gobob_logo_en.svg" class="w-[36px] h-[36px]" />
         </div>
         <nav class="flex-1 overflow-y-auto py-2">
           <template v-for="group in navGroups" :key="group.title">

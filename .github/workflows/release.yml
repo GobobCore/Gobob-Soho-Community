@@ -53,16 +53,17 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
       - name: Setup SSH key
         if: env.SOHO_DEPLOY_SSH_KEY != ''
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.SOHO_DEPLOY_SSH_KEY }}
+
+      - name: Checkout (SSH)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ssh-key: ${{ secrets.SOHO_DEPLOY_SSH_KEY }}
 
       - name: Configure git
         run: |

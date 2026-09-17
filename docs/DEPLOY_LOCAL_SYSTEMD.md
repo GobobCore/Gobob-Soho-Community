@@ -1,30 +1,42 @@
 # 本机裸机部署 (systemd, 无 docker)
 
 > **适用场景**: 开发者本机 / 内部测试机, 不想起 docker 容器
-> **当前环境**: gobob 主仓同机 (192.168.1.5), 3 个 systemd --user service
+> **当前环境**: gobob 主仓同机 (192.168.1.5), **6 个 systemd --user service (双站并行)**
 >
-> ⚠️ **R-Refactor (2026-09-16) 仓库拆分后**: 端口改 **19011/19012/19013**(避开 SaaS 19001/19002/19003),后端入口 `community.backend.main:app`,前端在 `community/portal` `community/app`,SQL 在 `shared/backend-core/sql/`。
+> ⚠️ **R-Fix (2026-09-17) 双 dev 站**: 同时跑 SaaS dev 站 (19001/02/03) 和 Community dev 站 (19011/12/13), 互不干扰:
+> - SaaS dev (19001/02/03): `gobob-soho-{backend,portal,app}.service` (R-Refactor 2026-09-16 起的, 跑 SaaS 版入口 cloud/backend-saas/main:app)
+> - Community dev (19011/12/13): `gobob-soho-community-{backend,portal,app}.service` (2026-09-17 新建, 跑社区版入口 community.backend.main:app)
+>
+> ⚠️ **R-Refactor (2026-09-16) 仓库拆分后**: 后端入口是 `community.backend.main:app`,前端在 `community/portal` `community/app`,SQL 在 `shared/backend-core/sql/`。
 
 跟 [DEPLOY.md](DEPLOY.md) 的 docker 方式并行,这份文档记录**本机 19011/19012/19013 直接由 systemd 管理**的实际部署经验。
 
 ---
 
-## 架构
+## 架构 (双 dev 站, 2026-09-17)
 
 ```
-┌────────────────────────────────────────────────────────┐
-│  systemd --user (linger=yes, 开机自起)                  │
-│                                                         │
-│  gobob-soho-backend.service   19011   FastAPI           │
-│  gobob-soho-portal.service    19012   Next.js 14        │
-│  gobob-soho-app.service       19013   Vue 3 SPA + proxy │
-└────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│  systemd --user (linger=yes, 开机自起)                          │
+│                                                                 │
+│  ── SaaS dev 站 (1900x) ──        ── Community dev 站 (1901x) ── │
+│  gobob-soho-backend.service       gobob-soho-community-backend   │
+│    19001 FastAPI (SaaS 入口)         19011 FastAPI (社区版入口)   │
+│  gobob-soho-portal.service        gobob-soho-community-portal    │
+│    19002 Next.js                     19012 Next.js                │
+│  gobob-soho-app.service           gobob-soho-community-app       │
+│    19003 Vue3 SPA                    19013 Vue3 SPA               │
+│  gobob-soho-ops.service           (SaaS 运营后台, 暂不开 dev)   │
+│    19004 运营后台                                                  │
+│  gobob-soho-aggregate-usage.service (SaaS 用量聚合 cron)          │
+└────────────────────────────────────────────────────────────────┘
          │                    │                  │
          └────────────────────┴──────────────────┘
                               │
                     gobob-backend (18797) SMB API
                               │
-                    MySQL gobob_soho 库 (共用本机 3306)
+                    MySQL gobob_soho (SaaS) / gobob_soho_community
+                    (Community dev, 同一台机)
 ```
 
 ---
@@ -32,9 +44,16 @@
 ## 文件位置
 
 ```
-~/.config/systemd/user/gobob-soho-backend.service
-~/.config/systemd/user/gobob-soho-portal.service
-~/.config/systemd/user/gobob-soho-app.service
+~/.config/systemd/user/
+├── gobob-soho-backend.service            (SaaS dev, 19001)
+├── gobob-soho-portal.service             (SaaS dev, 19002)
+├── gobob-soho-app.service                (SaaS dev, 19003)
+├── gobob-soho-ops.service                (SaaS 运营后台, 19004)
+├── gobob-soho-aggregate-usage.service     (SaaS 用量聚合 cron)
+│
+├── gobob-soho-community-backend.service  (Community dev, 19011) [R-Fix 2026-09-17 新建]
+├── gobob-soho-community-portal.service   (Community dev, 19012) [R-Fix 2026-09-17 新建]
+└── gobob-soho-community-app.service      (Community dev, 19013) [R-Fix 2026-09-17 新建]
 
 ~/.openclaw/workspace/gobob-soho/
 ├── shared/backend-core/         (FastAPI 业务核心)
@@ -197,21 +216,28 @@ curl http://127.0.0.1:19013/api/health   # 反代 backend 通
 ## 常用命令
 
 ```bash
-# 状态
-systemctl --user status gobob-soho-backend gobob-soho-portal gobob-soho-app
+# 状态 — 8 个 SOHO service
+for svc in gobob-soho-backend gobob-soho-portal gobob-soho-app gobob-soho-ops \
+           gobob-soho-community-backend gobob-soho-community-portal gobob-soho-community-app; do
+  echo "$svc: $(systemctl --user is-active $svc)"
+done
 
 # 重启某个
-systemctl --user restart gobob-soho-backend
+systemctl --user restart gobob-soho-community-backend    # Community dev 19011
+systemctl --user restart gobob-soho-community-portal     # Community dev 19012
+systemctl --user restart gobob-soho-community-app        # Community dev 19013
 
-# 全部重启
-systemctl --user restart gobob-soho-backend gobob-soho-portal gobob-soho-app
+# 全部重启 (SaaS + Community 双站)
+systemctl --user restart \
+  gobob-soho-backend gobob-soho-portal gobob-soho-app \
+  gobob-soho-community-backend gobob-soho-community-portal gobob-soho-community-app
 
 # 看日志
-journalctl --user -u gobob-soho-backend -n 50 --no-pager
-journalctl --user -u gobob-soho-portal -f
+journalctl --user -u gobob-soho-community-backend -n 50 --no-pager
+journalctl --user -u gobob-soho-community-portal -f
 
-# 关停
-systemctl --user stop gobob-soho-portal
+# 关停某个
+systemctl --user stop gobob-soho-community-portal
 ```
 
 ---

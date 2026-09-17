@@ -46,9 +46,9 @@
         <div class="flex items-center gap-2 mb-1">
           <img src="/logo.svg" class="w-9 h-9" />
           <div class="font-bold text-lg">Gobob Soho</div>
-          <span class="ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 bg-blue-100 text-blue-700 rounded">SaaS 多机构版</span>
+          <span class="ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 bg-blue-100 text-blue-700 rounded">Gobob Soho</span>
         </div>
-        <div class="text-sm text-slate-400 mb-6">留学机构业务管理系统 · 服务平台</div>
+        <div class="text-sm text-slate-400 mb-6">留学服务业务协作系统</div>
 
         <div class="space-y-3">
           <input v-model="username" placeholder="用户名" @keyup.enter="doLogin"
@@ -63,6 +63,9 @@
           <div class="text-center text-xs text-slate-400 pt-1">
             还没有账号？
             <a href="#/register" class="text-blue-600 hover:underline">自助注册机构</a>
+          </div>
+          <div class="text-center text-[11px] text-slate-400 pt-0.5">
+            Gobob workspace for small office home office
           </div>
         </div>
       </div>
@@ -82,7 +85,7 @@
   });
 
   // ════════════════════════════════════════════════════════════
-  // 自助注册机构 (SaaS 多机构版注册入口)
+  // 自助注册机构 (SaaS Gobob Soho 注册入口)
   // ════════════════════════════════════════════════════════════
   const RegisterView = defineComponent({
     emits: ["registered", "goto-login"],
@@ -98,9 +101,9 @@
         <div class="flex items-center gap-2 mb-1">
           <img src="/logo.svg" class="w-9 h-9" />
           <div class="font-bold text-lg">Gobob Soho</div>
-          <span class="ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 bg-blue-100 text-blue-700 rounded">SaaS 多机构版</span>
+          <span class="ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 bg-blue-100 text-blue-700 rounded">Gobob Soho</span>
         </div>
-        <div class="text-sm text-slate-400 mb-6">注册新机构 · 14 天免费试用</div>
+        <div class="text-sm text-slate-400 mb-6">留学服务业务协作系统</div>
 
         <div v-if="ok" class="text-center py-8">
           <div class="text-emerald-600 text-lg font-semibold mb-2">✓ 注册成功</div>

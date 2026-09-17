@@ -24,18 +24,23 @@ Gobob SOHO 是一个**独立部署、独立数据库**的业务管理系统，�
 ## 架构
 
 ```
-┌─────────────────────────── Gobob SOHO ───────────────────────────┐
-│                                                                    │
-│  portal/  获客门户 (Next.js)      app/  服务平台 (Vue3 SPA)         │
-│  :19002   智能评估引流            :19003  机构端 + 学生/家长端       │
-│       └──────────────┬────────────────┘                          │
-│                      ▼                                            │
-│              backend/  FastAPI + MySQL  :19001                    │
-│                      │  gobob-data-client (缓存 + 熔断)            │
-└──────────────────────┼─────────────────────────────────────────────┘
-                       ▼  HTTPS + X-API-Key
-              Gobob Data API  (/api/smb/v1/*)   ← 院校/专业/匹配 数据
+┌─────────────────────────── Gobob SOHO (社区版) ────────────────────┐
+│                                                                     │
+│  community/portal/  获客门户 (Next.js)    community/app/  服务平台  │
+│  :19012   智能评估引流                      :19013  Vue3 SPA        │
+│       └─────────────────┬─────────────────────┘                   │
+│                         ▼                                          │
+│     shared/backend-core/  FastAPI + MySQL  :19011                  │
+│                            │  gobob-data-client (缓存 + 熔断)        │
+└────────────────────────────┼──────────────────────────────────────┘
+                             ▼  HTTPS + X-API-Key
+                Gobob Data API  (/api/smb/v1/*)   ← 院校/专业/匹配 数据
 ```
+
+> 仓库采用 shared/ + community/ + cloud/ 三层结构 (R-Refactor 2026-09-16):
+> - `shared/backend-core/` — 业务核心 (社区版 + SaaS 版共用)
+> - `community/` — 开源版 (推到 GitHub)
+> - `cloud/` — SaaS 闭源 (本地 + Gitea, 不上 GitHub)
 
 ---
 
@@ -44,16 +49,17 @@ Gobob SOHO 是一个**独立部署、独立数据库**的业务管理系统，�
 **Docker (推荐, 生产)**:
 
 ```bash
-cp .env.example .env       # 填入你的配置（含 Gobob API Key，见下）
-docker compose up -d       # 起 mysql + backend + portal + app
+cd community/deploy
+cp ../../community/.env.example .env   # 填入配置（含 Gobob API Key，见下）
+docker compose up -d                    # 起 mysql + backend + portal + app
 ```
 
-**本机裸机 (开发/测试)**: 见 [`docs/QUICKSTART_LOCAL.md`](docs/QUICKSTART_LOCAL.md) (5 分钟跑起来) 或 [`docs/DEPLOY_LOCAL_SYSTEMD.md`](docs/DEPLOY_LOCAL_SYSTEMD.md) (systemd 长期跑)
+**本机裸机 (开发/测试)**: 见 [`community/QUICKSTART.md`](community/QUICKSTART.md) (5 分钟跑起来) 或 [`docs/DEPLOY_LOCAL_SYSTEMD.md`](docs/DEPLOY_LOCAL_SYSTEMD.md) (systemd 长期跑)
 
 打开：
-- 获客门户 http://localhost:19002
-- 服务平台 http://localhost:19003 （默认管理员见 `.env.example` 说明）
-- API 文档 http://localhost:19001/docs
+- 获客门户 http://localhost:19012
+- 服务平台 http://localhost:19013 （默认管理员见 `.env` 的 `SOHO_ADMIN_PASSWORD`）
+- API 文档 http://localhost:19011/docs
 
 ### 获取 Gobob API Key
 
@@ -66,11 +72,23 @@ docker compose up -d       # 起 mysql + backend + portal + app
 ## 仓库结构
 
 ```
-backend/    FastAPI 业务 API（纯后端）
-portal/     获客门户（Next.js 14，智能评估引流）
-app/        服务平台（Vue 3 SPA，机构端 + 学生/家长端）
-docs/       文档（部署 / 配置 / API / 贡献）
-deploy/     docker-compose 与部署脚本
+Gobob-SOHO/                            # 本仓库 (Apache-2.0)
+├── shared/                            # 业务核心 (社区版 + SaaS 版共用)
+│   └── backend-core/                  # FastAPI 业务路由 + core 模块
+│       ├── api/                       # 14 个业务路由 (leads/contracts/students/...)
+│       ├── core/                      # 6 个基础模块 (id_gen/auth/database/tenancy/gobob_client/config)
+│       ├── sql/                       # schema.sql + seed.sql
+│       └── main.py                    # FastAPI 工厂
+├── community/                         # 开源版 (推到 GitHub)
+│   ├── backend/main.py                # 开源版入口 (无 SaaS 计费/多机构)
+│   ├── portal/                        # Next.js 14 获客门户
+│   ├── app/                           # Vue 3 SPA 服务平台
+│   ├── deploy/                        # docker-compose + Dockerfile × 3
+│   ├── README.md                      # 社区版专属说明
+│   ├── QUICKSTART.md                  # 本机裸机 5 分钟
+│   └── LICENSE                        # Apache-2.0
+├── cloud/                             # SaaS 闭源 (本地 Gitea, 不上 GitHub)
+└── docs/                              # 部署 / 配置 / API / 贡献文档
 ```
 
 ---
@@ -78,14 +96,18 @@ deploy/     docker-compose 与部署脚本
 ## 文档
 
 **部署**:
+- [社区版 5 分钟 quickstart](community/QUICKSTART.md) (推荐, 本机裸机)
 - [部署指南 (Docker)](docs/DEPLOY.md)
-- [本机裸机 5 分钟 quickstart](docs/QUICKSTART_LOCAL.md)
 - [本机 systemd 长期跑](docs/DEPLOY_LOCAL_SYSTEMD.md)
 
 **集成**:
 - [获取 Gobob API Key](docs/GETTING_GOBOB_API_KEY.md)
 - [配置说明](docs/CONFIG.md)
 - [API 说明](docs/API.md)
+
+**仓库策略**:
+- [SaaS 闭源 vs 开源拆分说明](docs/SPLIT_PLAN_SAAS_VS_COMMUNITY_2026-09-16.md)
+- [仓库策略 (不开独立 repo)](docs/REPO_STRATEGY_2026-09-16.md)
 
 **贡献**:
 - [贡献指南](CONTRIBUTING.md)

@@ -132,7 +132,7 @@ else
     git fetch "$REMOTE_REPO" main 2>&1 | tail -1
 
     # 远端不能含 EXCLUDED_PATTERN
-    REMOTE_EXCLUDED=$(git ls-tree -r "$REMOTE_REPO/main" 2>/dev/null | grep -cE "\\b${EXCLUDED_PATTERN}" || true)
+    REMOTE_EXCLUDED=$(git ls-tree -r FETCH_HEAD 2>/dev/null | grep -cE "\\b${EXCLUDED_PATTERN}" || true)
     if [[ "$REMOTE_EXCLUDED" -gt 0 ]]; then
         error "远端 $TARGET 仓仍含 $REMOTE_EXCLUDED 个 ${EXCLUDED_PATTERN} 路径文件 — 必须先 hotfix 撤回!"
     else
@@ -140,7 +140,7 @@ else
     fi
 
     # 远端必须含主路径 (community 或 saas)
-    REMOTE_MAIN=$(git ls-tree -r "$REMOTE_REPO/main" 2>/dev/null | grep -cE "\\b${TARGET}/" || true)
+    REMOTE_MAIN=$(git ls-tree -r FETCH_HEAD 2>/dev/null | grep -cE "\\b${TARGET}/" || true)
     if [[ "$REMOTE_MAIN" -eq 0 ]]; then
         error "远端 $TARGET 仓不含 ${TARGET}/ 路径 — mirror push 可能失败"
     else

@@ -68,9 +68,9 @@
     <div v-else class="flex min-h-screen">
       <!-- 侧边栏 -->
       <aside class="w-56 bg-white border-r border-slate-200 flex flex-col fixed inset-y-0 shadow-sm">
-        <div class="h-14 flex items-center gap-2.5 px-4 border-b border-slate-200">
-          <!-- R-Refactor 2026-09-17: sidebar 直接显示远程 logo, 无外层样式 -->
-          <img src="https://gobob-img.oss-cn-beijing.aliyuncs.com/static/img/gobob_logo_en.svg" class="w-[36px] h-[36px]" />
+        <div class="h-[80px] flex items-center gap-2.5 px-4 border-b border-slate-200">
+          <!-- R-Refactor 2026-09-17: sidebar 直接显示远程 logo, 2 倍放大 -->
+          <img src="https://gobob-img.oss-cn-beijing.aliyuncs.com/static/img/gobob_logo_en.svg" class="w-[72px] h-[72px]" />
         </div>
         <nav class="flex-1 overflow-y-auto py-2">
           <template v-for="group in navGroups" :key="group.title">

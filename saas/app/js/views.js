@@ -39,38 +39,16 @@
   const LoginView = defineComponent({
     emits: ["logged-in"],
     data: () => ({ username: "", password: "", loading: false, err: "" }),
-    // R-Feat 2026-09-17: 公开 demo, 登录页直接显示 demo 账号 (admin / / one-click fill)
+    // R-Refactor 2026-09-17: SaaS 正式版登录页 (去掉 demo 提示 + 一键填入)
     template: `
     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
       <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
         <div class="flex items-center gap-2 mb-1">
           <img src="/logo.svg" class="w-9 h-9" />
-          <div class="font-bold text-lg">Gobob Soho 社区开源体验版</div>
-          <span class="ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded">公开 Demo</span>
+          <div class="font-bold text-lg">Gobob Soho</div>
+          <span class="ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 bg-blue-100 text-blue-700 rounded">SaaS 多机构版</span>
         </div>
         <div class="text-sm text-slate-400 mb-6">留学机构业务管理系统 · 服务平台</div>
-
-        <!-- 公开 demo 账号提示框 — 点击下方按钮一键填表 -->
-        <div class="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-          <div class="flex items-center gap-1.5 text-amber-800 text-xs font-semibold mb-1.5">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="m10.29 3.86 -8.18 14.18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
-            这是一个公开 Demo — 请勿写入真实业务数据
-          </div>
-          <div class="text-xs text-amber-700 leading-relaxed mb-2">
-            所有操作会定期清空。如需长期使用, 请访问
-            <a href="https://github.com/GobobCore/Gobob-Soho-Community" target="_blank" class="underline">社区版独立部署文档</a>。
-          </div>
-          <div class="flex items-center gap-2 text-xs whitespace-nowrap">
-            <span class="text-amber-700">Demo 凭据:</span>
-            <code class="bg-white border border-amber-200 rounded px-1.5 py-0.5 font-mono">admin</code>
-            <span class="text-amber-500">/</span>
-            <code class="bg-white border border-amber-200 rounded px-1.5 py-0.5 font-mono">Admin#2026x</code>
-            <button type="button" @click="fillDemo" data-testid="demo-fill"
-                    class="ml-auto text-[11px] bg-amber-500 hover:bg-amber-600 text-white rounded px-2 py-0.5 whitespace-nowrap">
-              一键填入
-            </button>
-          </div>
-        </div>
 
         <div class="space-y-3">
           <input v-model="username" placeholder="用户名" @keyup.enter="doLogin"
@@ -82,14 +60,14 @@
                   class="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50">
             {{ loading ? '登录中…' : '登 录' }}
           </button>
+          <div class="text-center text-xs text-slate-400 pt-1">
+            还没有账号？
+            <a href="/api/register" class="text-blue-600 hover:underline">自助注册机构</a>
+          </div>
         </div>
       </div>
     </div>`,
     methods: {
-      fillDemo() {
-        this.username = "admin";
-        this.password = "Admin#2026x";
-      },
       async doLogin() {
         if (!this.username || !this.password) { this.err = "请输入用户名和密码"; return; }
         this.loading = true; this.err = "";

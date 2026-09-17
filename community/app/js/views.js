@@ -42,10 +42,10 @@
     // R-Feat 2026-09-17: 公开 demo, 登录页直接显示 demo 账号 (admin / / one-click fill)
     template: `
     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
-      <div class="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8">
+      <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
         <div class="flex items-center gap-2 mb-1">
           <img src="/logo.svg" class="w-9 h-9" />
-          <div class="font-bold text-lg">Gobob SOHO</div>
+          <div class="font-bold text-lg">Gobob Soho 社区开源体验版</div>
           <span class="ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded">公开 Demo</span>
         </div>
         <div class="text-sm text-slate-400 mb-6">留学机构业务管理系统 · 服务平台</div>
@@ -60,13 +60,13 @@
             所有操作会定期清空。如需长期使用, 请访问
             <a href="https://github.com/GobobCore/Gobob-Soho-Community" target="_blank" class="underline">社区版独立部署文档</a>。
           </div>
-          <div class="flex items-center gap-2 text-xs">
+          <div class="flex items-center gap-2 text-xs whitespace-nowrap">
             <span class="text-amber-700">Demo 凭据:</span>
             <code class="bg-white border border-amber-200 rounded px-1.5 py-0.5 font-mono">admin</code>
             <span class="text-amber-500">/</span>
             <code class="bg-white border border-amber-200 rounded px-1.5 py-0.5 font-mono">Admin#2026x</code>
             <button type="button" @click="fillDemo" data-testid="demo-fill"
-                    class="ml-auto text-[11px] bg-amber-500 hover:bg-amber-600 text-white rounded px-2 py-0.5">
+                    class="ml-auto text-[11px] bg-amber-500 hover:bg-amber-600 text-white rounded px-2 py-0.5 whitespace-nowrap">
               一键填入
             </button>
           </div>
@@ -82,11 +82,6 @@
                   class="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50">
             {{ loading ? '登录中…' : '登 录' }}
           </button>
-        </div>
-
-        <div class="mt-4 text-center text-xs text-slate-400">
-          想体验自己的机构?
-          <a href="/register" target="_blank" class="text-blue-600 hover:underline">自助注册 →</a>
         </div>
       </div>
     </div>`,

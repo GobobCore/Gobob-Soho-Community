@@ -65,6 +65,8 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin git@github.com:GobobCore/Gobob-SOHO.git
           # 用 PAT 鉴权 (HTTPS URL), 单一 secret 适用所有 3 个仓
+          # 显式 unset core.sshCommand 让 fetch 走 HTTPS 不走 SSH (actions/checkout 设了 ssh-key)
+          git config --local core.sshCommand "echo 'SSH disabled for HTTPS-only remotes' && exit 1"
           git remote add audit-community "https://x-access-token:${SOHO_GITHUB_TOKEN}@github.com/GobobCore/Gobob-Soho-Community.git"
           git remote add audit-saas "https://x-access-token:${SOHO_GITHUB_TOKEN}@github.com/GobobCore/Gobob-Soho-SaaS.git"
           git fetch audit-community main

@@ -42,7 +42,7 @@ elif [[ "$TARGET" == "saas" ]]; then
     REMOTE_REPO="git@github.com:GobobCore/Gobob-Soho-SaaS.git"
     EXCLUDED_PATTERN="community/"   # SaaS 仓禁止含 community/
     EXCLUDED_LABEL="社区版开源目录"
-    MAIN_PATTERN="backend/"          # SaaS 仓主路径 (扁平化结构: backend/ + soho-ops/, 无 saas/ 顶层)
+    MAIN_PATTERN="saas/"             # SaaS 仓主路径 (mirror monorepo, 顶层有 saas/ 目录)
 fi
 
 cd "$SOHO_REPO"

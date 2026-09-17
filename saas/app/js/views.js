@@ -44,7 +44,7 @@
     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
       <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
         <div class="flex items-center gap-2 mb-1">
-          <img src="https://gobob-img.oss-cn-beijing.aliyuncs.com/static/img/gobob_logo_en.svg" class="w-9 h-9" />
+          <img src="https://gobob-img.oss-cn-beijing.aliyuncs.com/static/img/gobob_logo_en.svg" class="w-[72px] h-[72px]" />
           <span class="ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 bg-blue-100 text-blue-700 rounded">Gobob Soho</span>
         </div>
         <div class="text-sm text-slate-400 mb-6">留学服务业务协作系统</div>
@@ -98,7 +98,7 @@
     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
       <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
         <div class="flex items-center gap-2 mb-1">
-          <img src="https://gobob-img.oss-cn-beijing.aliyuncs.com/static/img/gobob_logo_en.svg" class="w-9 h-9" />
+          <img src="https://gobob-img.oss-cn-beijing.aliyuncs.com/static/img/gobob_logo_en.svg" class="w-[72px] h-[72px]" />
           <span class="ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 bg-blue-100 text-blue-700 rounded">Gobob Soho</span>
         </div>
         <div class="text-sm text-slate-400 mb-6">留学服务业务协作系统</div>

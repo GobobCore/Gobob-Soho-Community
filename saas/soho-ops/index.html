@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gobob SOHO — SaaS 运营后台</title>
+  <link rel="icon" href="/logo.svg" />
+  <script src="/vue.js"></script>
+  <script src="/tailwind.js"></script>
+  <style>
+    :root {
+      --primary-50:  #FDF6EE;
+      --primary-100: #FAE6CD;
+      --primary-200: #F4CC9A;
+      --primary-300: #EDB776;
+      --primary-500: #E08A44;
+      --primary-600: #C97636;
+      --primary-700: #A85F26;
+    }
+    [v-cloak]{display:none}
+    body {
+      background:
+        radial-gradient(1200px 600px at 80% -10%, rgba(224, 138, 68, 0.06), transparent 60%),
+        radial-gradient(900px 500px at -10% 20%, rgba(201, 118, 54, 0.04), transparent 60%),
+        #F9FAFB;
+    }
+    .navlink{transition:all .15s;color:#4B5563}
+    .navlink:hover{background:var(--primary-50);color:var(--primary-700)}
+    .navlink.active{
+      background:var(--primary-50);
+      color:var(--primary-700);
+      border-left:3px solid var(--primary-600);
+      font-weight:600;
+    }
+    .navlink svg{color:currentColor}
+    .btn-primary{
+      display:inline-flex;align-items:center;justify-content:center;gap:.5rem;
+      padding:.5rem 1rem;border-radius:.75rem;font-weight:600;color:#fff;font-size:.875rem;
+      background:linear-gradient(135deg, var(--primary-500), var(--primary-600));
+      box-shadow:0 4px 20px rgba(224, 138, 68, 0.28);
+      transition:all .2s;
+    }
+    .btn-primary:hover{
+      background:linear-gradient(135deg, var(--primary-600), var(--primary-700));
+      transform:translateY(-1px);
+      box-shadow:0 8px 24px rgba(15, 23, 42, 0.1);
+    }
+    .badge{display:inline-flex;align-items:center;padding:.125rem .625rem;border-radius:9999px;font-size:.75rem;font-weight:600}
+    .badge-free{background:#F3F4F6;color:#4B5563}
+    .badge-paid{background:#D1FAE5;color:#047857}
+    .badge-trial{background:#DBEAFE;color:#1D4ED8}
+    .badge-suspended{background:#FEE2E2;color:#B91C1C}
+    .badge-pending{background:#FEF3C7;color:#B45309}
+    .badge-void{background:#F3F4F6;color:#9CA3AF}
+  </style>
+</head>
+<body class="text-slate-800">
+  <div class="h-1 bg-gradient-to-r from-[#E08A44] via-[#E59E56] to-[#C97636]"></div>
+
+  <div id="app" v-cloak>
+    <login-view v-if="!loggedIn" @logged-in="onLoggedIn"></login-view>
+
+    <div v-else class="flex min-h-screen">
+      <!-- 侧边栏 -->
+      <aside class="w-56 bg-white border-r border-slate-200 flex flex-col fixed inset-y-0 shadow-sm">
+        <div class="h-14 flex items-center gap-2.5 px-4 border-b border-slate-200">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-[#E08A44] to-[#C97636] flex items-center justify-center shadow-[0_4px_12px_rgba(224,138,68,0.32)]">
+            <img src="/logo.svg" class="w-5 h-5 brightness-0 invert" />
+          </div>
+          <div>
+            <div class="font-bold text-sm leading-tight tracking-tight">Gobob SOHO</div>
+            <div class="text-xs text-slate-400">SaaS 运营后台</div>
+          </div>
+        </div>
+        <nav class="flex-1 overflow-y-auto py-2">
+          <a v-for="item in nav" :key="item.view"
+             @click="go(item.view)"
+             :class="['navlink flex items-center gap-2.5 px-4 py-2 text-sm cursor-pointer', currentView===item.view?'active':'']">
+            <span v-html="item.icon" class="inline-flex items-center"></span>
+            <span>{{ item.label }}</span>
+          </a>
+        </nav>
+        <div class="border-t border-slate-200 p-3">
+          <div class="text-sm font-medium">{{ admin.name || admin.username }}</div>
+          <div class="text-xs text-slate-400 mb-2">运营</div>
+          <button @click="logout" class="text-xs text-red-500 hover:underline">退出登录</button>
+        </div>
+      </aside>
+
+      <!-- 主内容 -->
+      <main class="flex-1 ml-56 p-6">
+        <component :is="currentComponent" v-if="currentView" :ctx="ctx" @navigate="go"></component>
+      </main>
+    </div>
+
+    <div v-if="toast.msg" class="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg shadow-lg text-white text-sm"
+         :class="toast.type==='error'?'bg-red-500':'bg-emerald-600'">{{ toast.msg }}</div>
+  </div>
+
+  <script src="/js/shared.js"></script>
+  <script src="/js/views.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>

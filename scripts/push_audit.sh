@@ -133,8 +133,18 @@ else
     echo "  拉取远端 main HEAD..."
     # 每个 target 用独立 remote alias, 避免 FETCH_HEAD 引用混淆
     REMOTE_ALIAS="audit-${TARGET}"
-    git remote add "$REMOTE_ALIAS" "$REMOTE_REPO" 2>/dev/null || git remote set-url "$REMOTE_ALIAS" "$REMOTE_REPO"
-    git fetch "$REMOTE_ALIAS" main 2>&1 | tail -1
+    # 如果 remote 已存在(可能上次没清理干净), 先 remove 再 add
+    git remote remove "$REMOTE_ALIAS" 2>/dev/null || true
+    git remote add "$REMOTE_ALIAS" "$REMOTE_REPO"
+    echo "  git fetch $REMOTE_ALIAS main ..."
+    FETCH_OUTPUT=$(git fetch "$REMOTE_ALIAS" main 2>&1)
+    FETCH_EXIT=$?
+    echo "$FETCH_OUTPUT" | tail -3
+    if [[ $FETCH_EXIT -ne 0 ]]; then
+        error "git fetch 失败 (exit=$FETCH_EXIT), 无法继续远端审计"
+        git remote remove "$REMOTE_ALIAS" 2>/dev/null
+        return 2>/dev/null || exit 1
+    fi
 
     # 远端不能含 EXCLUDED_PATTERN
     REMOTE_EXCLUDED=$(git ls-tree -r "$REMOTE_ALIAS/main" 2>/dev/null | grep -cE "[^/]${EXCLUDED_PATTERN}" || true)

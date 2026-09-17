@@ -1,7 +1,21 @@
-# Gobob SOHO
+# Gobob SOHO — Development Monorepo (Internal)
 
-> 面向中小型留学机构与语言培训工作室的**开源业务管理系统**。
-> 覆盖完整闭环：**获客（智能评估引流）→ 线索/生源管理 → 签约 → 留学进程服务 → 老师协作与换师 → 老板管理视图**。
+> ⚠️ **本仓是开发 monorepo** — 含 `shared/` + `community/` + `cloud/` 三层, **不直接发布**。
+>
+> 三个仓分工 (R-Refactor 2026-09-17):
+>
+> | 仓 | 用途 | License | GitHub |
+> |---|---|---|---|
+> | **本仓 `Gobob-SOHO`** | 开发 monorepo, 三层全在内 | (内部, 不发布) | intsch Gitea |
+> | **`Gobob-Soho-Community`** | 开源社区版, 推到 GitHub | Apache-2.0 | [github.com/GobobCore/Gobob-Soho-Community](https://github.com/GobobCore/Gobob-Soho-Community) |
+> | **`Gobob-Soho-SaaS`** | SaaS 闭源版, 推到 GitHub (private) | proprietary | [github.com/GobobCore/Gobob-Soho-SaaS](https://github.com/GobobCore/Gobob-Soho-SaaS) (private) |
+>
+> 开发改本仓 → release 时推到两个独立 repo (见 `docs/REPO_SPLIT.md` 拆分脚本)。
+
+---
+
+**面向中小型留学机构与语言培训工作室的业务管理系统**。
+覆盖完整闭环：**获客（智能评估引流）→ 线索/生源管理 → 签约 → 留学进程服务 → 老师协作与换师 → 老板管理视图**。
 
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -39,8 +53,8 @@ Gobob SOHO 是一个**独立部署、独立数据库**的业务管理系统，�
 
 > 仓库采用 shared/ + community/ + cloud/ 三层结构 (R-Refactor 2026-09-16):
 > - `shared/backend-core/` — 业务核心 (社区版 + SaaS 版共用)
-> - `community/` — 开源版 (推到 GitHub)
-> - `cloud/` — SaaS 闭源 (本地 + Gitea, 不上 GitHub)
+> - `community/` — 开源版 (推到 GitHub `Gobob-Soho-Community`, Apache-2.0)
+> - `cloud/` — SaaS 闭源 (推到 GitHub `Gobob-Soho-SaaS` private, proprietary)
 
 ---
 
@@ -107,7 +121,8 @@ Gobob-SOHO/                            # 本仓库 (Apache-2.0)
 
 **仓库策略**:
 - [SaaS 闭源 vs 开源拆分说明](docs/SPLIT_PLAN_SAAS_VS_COMMUNITY_2026-09-16.md)
-- [仓库策略 (不开独立 repo)](docs/REPO_STRATEGY_2026-09-16.md)
+- [仓库策略 (三仓分工)](docs/REPO_SPLIT.md) — 本仓 + Community + SaaS
+- [仓库策略 (不开独立 repo, 历史)](docs/REPO_STRATEGY_2026-09-16.md)
 
 **贡献**:
 - [贡献指南](CONTRIBUTING.md)

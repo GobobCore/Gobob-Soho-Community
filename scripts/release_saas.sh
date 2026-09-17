@@ -46,12 +46,22 @@ if [[ -n $(git status --porcelain saas/ shared/ scripts/release_saas.sh 2>/dev/n
 fi
 echo "  ✓ 工作树干净"
 
-# 2. 警告: monorepo 内有 community/ 目录 (设计如此, hotfix 会撤回)
+# 2. 推送前 audit (调用 push_audit.sh 扫敏感信息 + 路径校验)
 echo ""
-echo "=== 2. 检查 community/ 在 monorepo 内的存在 (设计如此, hotfix 会撤回) ==="
-COMM_IN_MONOREPO=$(git ls-files community/ 2>/dev/null | wc -l)
-echo "  monorepo 内有 $COMM_IN_MONOREPO 个 community/ 文件 (正常, 后面 hotfix 撤回)"
-echo "  ⚠️  mirror push 会带这些文件到 SaaS 仓, hotfix step 会自动 git rm -rf community/"
+echo "=== 2. 推送前 audit (scripts/push_audit.sh saas) ==="
+if [[ -n "$DRY_RUN" ]]; then
+    echo "  (dry-run, 跳过 audit)"
+else
+    if ! bash "$SCRIPT_DIR/push_audit.sh" saas; then
+        AUDIT_EXIT=$?
+        if [[ "$AUDIT_EXIT" -eq 2 ]]; then
+            echo "  ⚠️  audit 有警告, 但阻断 ERROR 数为 0, 继续推送"
+        else
+            echo "  ❌ audit 失败 (exit $AUDIT_EXIT), 禁止推送"
+            exit 1
+        fi
+    fi
+fi
 
 # 3. 敏感信息扫描
 echo ""

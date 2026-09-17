@@ -1,0 +1,197 @@
+name: Release SOHO (Community + SaaS)
+
+# 自动跑 release_*.sh:
+#   - workflow_dispatch: PM 手动触发 (默认先 dry-run, 加 confirm=true 才真推)
+#   - schedule: 每周日凌晨 02:00 (北京时间 10:00) 周更兜底
+#
+# 鉴权: GitHub Actions 用 secrets.SOHO_DEPLOY_SSH_KEY 推到 GitHub (写权限)
+#       secrets.PM_TRIGGER_TOKEN (可选) 防外部滥用
+#
+# 安全:
+#   - 默认 dry_run=true, 必须显式 confirm=true 才真推
+#   - 推送前 audit (push_audit.sh) 必须 exit 0, 否则阻断
+#   - hotfix 撤回后用 grep 验证远端无禁路径
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry-run only (default true, set false to actually push)"
+        required: false
+        default: "true"
+      target:
+        description: "Which target to release (community / saas / both)"
+        required: false
+        default: "both"
+      confirm:
+        description: "Confirm push (required to actually push, default empty)"
+        required: false
+        default: ""
+
+  schedule:
+    # 每周日 UTC 18:00 (= 北京时间 周一 02:00) 周更
+    # 注释: cron 触发也要 dry_run=true, 仅 audit 不会推送
+    - cron: "0 18 * * 0"
+
+  # 手动触发的审计失败不阻断 push (workflow_run)
+  # 推送 push 触发 audit 重跑 (防有人在 GitHub 上直接 force-push)
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/release_*.sh'
+      - 'scripts/push_audit.sh'
+      - '.github/workflows/release.yml'
+
+env:
+  SOHO_REPO_DIR: ${{ github.workspace }}
+
+jobs:
+  audit:
+    name: Push audit (sensitive info + path isolation)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH key
+        if: env.SOHO_DEPLOY_SSH_KEY != ''
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SOHO_DEPLOY_SSH_KEY }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin git@github.com:GobobCore/Gobob-SOHO.git
+
+      # Audit community release
+      - name: Audit for community release
+        run: |
+          echo "===== audit: community ====="
+          bash scripts/push_audit.sh community
+        continue-on-error: false
+
+      # Audit SaaS release
+      - name: Audit for SaaS release
+        run: |
+          echo "===== audit: saas ====="
+          bash scripts/push_audit.sh saas
+        continue-on-error: false
+
+  release-community:
+    name: Release community version
+    runs-on: ubuntu-latest
+    needs: audit
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH key
+        if: env.SOHO_DEPLOY_SSH_KEY != ''
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SOHO_DEPLOY_SSH_KEY }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin git@github.com:GobobCore/Gobob-SOHO.git
+
+      - name: Skip if not requested
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.target == 'saas' || (inputs.dry_run != 'true' && inputs.confirm != 'true')) }}
+        run: |
+          echo "Skipped (target=${{ inputs.target }}, dry_run=${{ inputs.dry_run }}, confirm=${{ inputs.confirm }})"
+
+      - name: Run release_community.sh
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.target != 'saas' && (inputs.dry_run == 'true' || inputs.confirm == 'true')) }}
+        env:
+          DRY_RUN: ${{ inputs.dry_run || 'true' }}
+        run: |
+          TARGET_FLAG=""
+          if [[ "$DRY_RUN" == "true" ]]; then
+            TARGET_FLAG="--dry-run"
+          fi
+          bash scripts/release_community.sh $TARGET_FLAG
+
+  release-saas:
+    name: Release SaaS version
+    runs-on: ubuntu-latest
+    needs: audit
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup SSH key
+        if: env.SOHO_DEPLOY_SSH_KEY != ''
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SOHO_DEPLOY_SSH_KEY }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin git@github.com:GobobCore/Gobob-SOHO.git
+
+      - name: Skip if not requested
+        if: ${{ github.event_name == 'workflow_dispatch' && (inputs.target == 'community' || (inputs.dry_run != 'true' && inputs.confirm != 'true')) }}
+        run: |
+          echo "Skipped (target=${{ inputs.target }}, dry_run=${{ inputs.dry_run }}, confirm=${{ inputs.confirm }})"
+
+      - name: Run release_saas.sh
+        if: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.target != 'community' && (inputs.dry_run == 'true' || inputs.confirm == 'true')) }}
+        env:
+          DRY_RUN: ${{ inputs.dry_run || 'true' }}
+        run: |
+          TARGET_FLAG=""
+          if [[ "$DRY_RUN" == "true" ]]; then
+            TARGET_FLAG="--dry-run"
+          fi
+          bash scripts/release_saas.sh $TARGET_FLAG
+
+  notify:
+    name: Notify on failure
+    needs: [audit, release-community, release-saas]
+    if: failure()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify via issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const auditUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `## ⚠️ SOHO Release Failed
+
+            - Workflow: ${context.workflow}
+            - Run: #${context.runNumber}
+            - Triggered by: ${context.actor}
+            - URL: ${auditUrl}
+
+            请人工 review:
+            1. 检查 audit 是否发现新敏感信息
+            2. 检查 release 脚本 hotfix step 是否成功
+            3. 检查远端仓是否含不该有的路径
+            `;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[release-fail] ${new Date().toISOString().slice(0,16)} SOHO release failed`,
+              body: body,
+              labels: ['release-failure', 'soho']
+            });

@@ -71,7 +71,7 @@ echo "=== 3. git subtree push --prefix=saas ==="
 if [[ -n "$DRY_RUN" ]]; then
     echo "  (dry-run, 跳过实际推送)"
 else
-    git subtree push --prefix=saas "$SAAS_REPO" "$BRANCH"
+    git subtree push --prefix=saas "$SAAS_REPO" "$BRANCH" --force
 fi
 
 # 4. 推送 shared/backend-core

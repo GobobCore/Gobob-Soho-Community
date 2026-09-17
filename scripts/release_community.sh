@@ -62,25 +62,17 @@ if [[ "$SAAS_IN_HISTORY" -gt 0 ]]; then
 fi
 echo "  ✓ saas/ 当前不在 git index 里"
 
-# 3. 推送
+# 3. 推送 community/ + shared/backend-core 合并 subtree (用 split + force-push)
 echo ""
-echo "=== 3. git subtree push --prefix=community ==="
+echo "=== 3. git subtree split --prefix=community --prefix=shared/backend-core + force-push ==="
 if [[ -n "$DRY_RUN" ]]; then
     echo "  (dry-run, 跳过实际推送)"
 else
-    git subtree push --prefix=community "$COMMUNITY_REPO" "$BRANCH"
-fi
-
-# 4. 推送 shared/ 单独 commit
-echo ""
-echo "=== 4. git subtree push --prefix=shared/backend-core ==="
-if [[ -n "$DRY_RUN" ]]; then
-    echo "  (dry-run, 跳过实际推送)"
-else
-    # shared/backend-core 是另一个 subtree, 但社区独立仓已经有 shared/ 子目录,
-    # 这里用 push 增量更新 (社区仓 setup 时已带 shared/ 内容)
-    git subtree push --prefix=shared/backend-core "$COMMUNITY_REPO" "$BRANCH-shared-core" --squash 2>&1 || \
-        echo "  ⚠️  shared/backend-core 推送失败, 可能社区仓分支已存在, 手动 git push 处理"
+    SPLIT_BRANCH="release-community-$(date +%Y%m%d-%H%M%S)"
+    # 合并 community/ 和 shared/backend-core 到一个临时分支, 一次性 force-push 到社区仓 main
+    git subtree split --prefix=community --prefix=shared/backend-core -b "$SPLIT_BRANCH"
+    git push "$COMMUNITY_REPO" "$SPLIT_BRANCH:$BRANCH" --force
+    git branch -D "$SPLIT_BRANCH"
 fi
 
 echo ""

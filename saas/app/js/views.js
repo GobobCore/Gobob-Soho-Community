@@ -1343,16 +1343,82 @@
       isOwner: false,
       loading: true,
       saving: false,
+      savingPwd: false,
       err: "",
       ok: "",
+      profileForm: { name: "", phone: "", email: "", wechat: "" },
+      pwdForm: { old_password: "", new_password: "", confirm: "" },
       form: { name: "", description: "", address: "", phone: "", email: "", website: "", logo_url: "" },
     }),
     template: `
     <div>
       <h1 class="text-xl font-bold mb-4">设置</h1>
 
+      <!-- 个人信息 — 任何登录用户都能改自己的 -->
+      <card title="个人信息">
+        <div class="space-y-3">
+          <div class="grid md:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">姓名 <span class="text-red-500">*</span></label>
+              <input v-model="profileForm.name" placeholder="您的姓名"
+                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">个人手机</label>
+              <input v-model="profileForm.phone" placeholder="13900000000"
+                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+          </div>
+          <div class="grid md:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">个人邮箱</label>
+              <input v-model="profileForm.email" type="email" placeholder="you@example.com"
+                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">微信号</label>
+              <input v-model="profileForm.wechat" placeholder="可选"
+                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            </div>
+          </div>
+          <div v-if="profileErr" class="text-sm text-red-500">{{ profileErr }}</div>
+          <div v-if="profileOk" class="text-sm text-emerald-600">{{ profileOk }}</div>
+          <button @click="saveProfile" :disabled="saving || !profileForm.name.trim()"
+                  class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+            {{ saving ? '保存中…' : '保存个人信息' }}
+          </button>
+        </div>
+      </card>
+
+      <!-- 修改密码 — 任何登录用户都能改自己的 -->
+      <card title="修改密码" class="mt-4">
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-slate-500 mb-1">当前密码</label>
+            <input v-model="pwdForm.old_password" type="password" placeholder="输入当前密码"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-500 mb-1">新密码 (≥ 8 位)</label>
+            <input v-model="pwdForm.new_password" type="password" placeholder="新密码"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs text-slate-500 mb-1">确认新密码</label>
+            <input v-model="pwdForm.confirm" type="password" placeholder="再次输入新密码"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          </div>
+          <div v-if="pwdErr" class="text-sm text-red-500">{{ pwdErr }}</div>
+          <div v-if="pwdOk" class="text-sm text-emerald-600">{{ pwdOk }}</div>
+          <button @click="savePassword" :disabled="savingPwd || !canChangePwd"
+                  class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+            {{ savingPwd ? '修改中…' : '修改密码' }}
+          </button>
+        </div>
+      </card>
+
       <!-- 机构信息 — owner 可编辑, 其他角色只读 -->
-      <card title="机构信息">
+      <card title="机构信息" class="mt-4">
         <div v-if="loading" class="text-sm text-slate-400">加载中…</div>
         <template v-else>
           <div class="space-y-3">
@@ -1426,15 +1492,31 @@
       </card>
     </div>`,
     computed: {
-      // owner 才能编辑 — SaaS 跟 community 都用此视图, owner-only 写更安全
+      canChangePwd() {
+        return this.pwdForm.old_password
+          && this.pwdForm.new_password.length >= 8
+          && this.pwdForm.new_password === this.pwdForm.confirm;
+      },
     },
     methods: {
+      profileErr: "",
+      profileOk: "",
+      pwdErr: "",
+      pwdOk: "",
       async load() {
         this.loading = true; this.err = "";
         try {
           const u = S().getUser();
           this.user = u;
           this.isOwner = u && u.role === "owner";
+          // 加载个人信息
+          this.profileForm = {
+            name: u && u.name || "",
+            phone: u && u.phone || "",
+            email: u && u.email || "",
+            wechat: u && u.wechat || "",
+          };
+          // 加载机构信息
           const data = await S().get("/api/orgs/me");
           this.org = data;
           this.form = {
@@ -1448,6 +1530,36 @@
           };
         } catch (e) { this.err = "加载失败: " + e.message; }
         this.loading = false;
+      },
+      async saveProfile() {
+        this.saving = true; this.profileErr = ""; this.profileOk = "";
+        try {
+          const body = {};
+          for (const k of Object.keys(this.profileForm)) {
+            const v = this.profileForm[k];
+            if (v && v.trim()) body[k] = v;
+          }
+          const r = await S().patch("/api/profile", body);
+          this.profileOk = `已更新 ${r.updated} 项`;
+          // 同步本地 user (name/phone/email/wechat) + 写回 localStorage
+          const u = S().getUser() || {};
+          Object.assign(u, this.profileForm);
+          localStorage.setItem(S().USER_KEY || "soho_user", JSON.stringify(u));
+          this.user = u;
+        } catch (e) { this.profileErr = "保存失败: " + e.message; }
+        this.saving = false;
+      },
+      async savePassword() {
+        this.savingPwd = true; this.pwdErr = ""; this.pwdOk = "";
+        try {
+          await S().post("/api/change-password", {
+            old_password: this.pwdForm.old_password,
+            new_password: this.pwdForm.new_password,
+          });
+          this.pwdOk = "密码修改成功, 下次登录请用新密码";
+          this.pwdForm = { old_password: "", new_password: "", confirm: "" };
+        } catch (e) { this.pwdErr = e.message || "修改失败"; }
+        this.savingPwd = false;
       },
       async save() {
         this.saving = true; this.err = ""; this.ok = "";

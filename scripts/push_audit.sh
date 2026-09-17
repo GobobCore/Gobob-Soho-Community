@@ -131,23 +131,29 @@ if [[ -n "$SKIP_FETCH" ]]; then
     echo "  (--skip-fetch, 跳过远端检查)"
 else
     echo "  拉取远端 main HEAD..."
-    git fetch "$REMOTE_REPO" main 2>&1 | tail -1
+    # 每个 target 用独立 remote alias, 避免 FETCH_HEAD 引用混淆
+    REMOTE_ALIAS="audit-${TARGET}"
+    git remote add "$REMOTE_ALIAS" "$REMOTE_REPO" 2>/dev/null || git remote set-url "$REMOTE_ALIAS" "$REMOTE_REPO"
+    git fetch "$REMOTE_ALIAS" main 2>&1 | tail -1
 
     # 远端不能含 EXCLUDED_PATTERN
-    REMOTE_EXCLUDED=$(git ls-tree -r FETCH_HEAD 2>/dev/null | grep -cE "\\b${EXCLUDED_PATTERN}" || true)
+    REMOTE_EXCLUDED=$(git ls-tree -r "$REMOTE_ALIAS/main" 2>/dev/null | grep -cE "\\b${EXCLUDED_PATTERN}" || true)
     if [[ "$REMOTE_EXCLUDED" -gt 0 ]]; then
         error "远端 $TARGET 仓仍含 $REMOTE_EXCLUDED 个 ${EXCLUDED_PATTERN} 路径文件 — 必须先 hotfix 撤回!"
     else
         ok "远端 $TARGET 仓无 ${EXCLUDED_PATTERN} 路径"
     fi
 
-    # 远端必须含主路径 (community 或 saas)
-    REMOTE_MAIN=$(git ls-tree -r FETCH_HEAD 2>/dev/null | grep -cE "\\b${MAIN_PATTERN}" || true)
+    # 远端必须含主路径 (community 或 backend)
+    REMOTE_MAIN=$(git ls-tree -r "$REMOTE_ALIAS/main" 2>/dev/null | grep -cE "\\b${MAIN_PATTERN}" || true)
     if [[ "$REMOTE_MAIN" -eq 0 ]]; then
         error "远端 $TARGET 仓不含 ${MAIN_PATTERN} 路径 — mirror push 可能失败"
     else
         ok "远端 $TARGET 仓含 $REMOTE_MAIN 个 ${MAIN_PATTERN} 路径文件"
     fi
+
+    # 清理临时 remote
+    git remote remove "$REMOTE_ALIAS" 2>/dev/null
 fi
 echo ""
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gobob SOHO — SaaS 多机构版</title>
+  <title>Gobob SOHO</title>
   <link rel="icon" href="/logo.svg" />
   <script src="/vue.js"></script>
   <script src="/tailwind.js"></script>
@@ -69,13 +69,9 @@
       <!-- 侧边栏 -->
       <aside class="w-56 bg-white border-r border-slate-200 flex flex-col fixed inset-y-0 shadow-sm">
         <div class="h-14 flex items-center gap-2.5 px-4 border-b border-slate-200">
-          <!-- R-Design: logo 加渐变徽章 (跟 portal 一致) -->
+          <!-- R-Refactor 2026-09-17: sidebar logo 改远程 OSS URL, 去掉右侧品牌文案 -->
           <div class="w-8 h-8 rounded-xl bg-gradient-to-br from-[#E08A44] to-[#C97636] flex items-center justify-center shadow-[0_4px_12px_rgba(224,138,68,0.32)]">
-            <img src="/logo.svg" class="w-5 h-5 brightness-0 invert" />
-          </div>
-          <div>
-            <div class="font-bold text-sm leading-tight tracking-tight">SaaS 多机构版</div>
-            <div class="text-xs text-slate-400">{{ isStaffNow ? '机构端' : '学生端' }}</div>
+            <img src="https://gobob-img.oss-cn-beijing.aliyuncs.com/static/img/gobob_logo_en.svg" class="w-5 h-5 brightness-0 invert" />
           </div>
         </div>
         <nav class="flex-1 overflow-y-auto py-2">

@@ -60,19 +60,19 @@ jobs:
           ssh-key: ${{ secrets.SOHO_DEPLOY_SSH_KEY }}
 
       - name: Configure git + HTTPS remotes (用 PAT 鉴权, 避免 SSH key 多仓问题)
+        env:
+          SOHO_GITHUB_TOKEN: ${{ secrets.SOHO_GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin git@github.com:GobobCore/Gobob-SOHO.git
+          # 显式 unset core.sshCommand 让 fetch 走 HTTPS 不走 SSH
+          git config --local core.sshCommand "false"
           # 用 PAT 鉴权 (HTTPS URL), 单一 secret 适用所有 3 个仓
-          # 显式 unset core.sshCommand 让 fetch 走 HTTPS 不走 SSH (actions/checkout 设了 ssh-key)
-          git config --local core.sshCommand "echo 'SSH disabled for HTTPS-only remotes' && exit 1"
           git remote add audit-community "https://x-access-token:${SOHO_GITHUB_TOKEN}@github.com/GobobCore/Gobob-Soho-Community.git"
           git remote add audit-saas "https://x-access-token:${SOHO_GITHUB_TOKEN}@github.com/GobobCore/Gobob-Soho-SaaS.git"
-          git fetch audit-community main
-          git fetch audit-saas main
-        env:
-          SOHO_GITHUB_TOKEN: ${{ secrets.SOHO_GITHUB_TOKEN }}
+          git fetch audit-community main 2>&1
+          git fetch audit-saas main 2>&1
 
       # Audit community release
       - name: Audit for community release

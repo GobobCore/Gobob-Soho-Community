@@ -105,7 +105,7 @@ if [[ -n "$DRY_RUN" ]]; then
     echo "  (dry-run, 跳过验证)"
 else
     git fetch "$SAAS_REPO" "$BRANCH" 2>&1 | tail -1
-    COMM_COUNT=$(git ls-tree -r "$SAAS_REPO/$BRANCH" 2>/dev/null | grep -c "/community/" || true)
+    COMM_COUNT=$(git ls-tree -r "$SAAS_REPO/$BRANCH" 2>/dev/null | grep -cE "\\bcommunity/" || true)
     if [[ "$COMM_COUNT" -gt 0 ]]; then
         echo "  ❌ 远端 SaaS 仓仍含 $COMM_COUNT 个 community/ 路径文件 — 立刻手动撤回!"
         exit 1

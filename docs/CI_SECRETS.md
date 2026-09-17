@@ -16,8 +16,27 @@ GitHub Actions 推代码到 `Gobob-Soho-Community` 和 `Gobob-Soho-SaaS` 远端�
 
 | Secret 名 | 用途 | 配置方法 |
 |-----------|------|----------|
-| **`SOHO_DEPLOY_SSH_KEY`** | 推送到 Community / SaaS 远端仓的 SSH private key | `cat ~/.ssh/id_xxx` 内容粘贴 (整段含 `-----BEGIN...-----` 头尾) |
+| **`SOHO_GITHUB_TOKEN`** | PAT (Personal Access Token) — workflow 用 HTTPS + x-access-token 鉴权 fetch 3 仓 | 用 `gh auth login` 生成 fine-grained PAT, scope 含 `Contents: Read+Write` + `Deployments: Read+Write` + `Metadata: Read` + `admin:org` |
+| `SOHO_DEPLOY_SSH_KEY` | (deprecated, 当前 workflow 已切换到 HTTPS) 推送到 Community / SaaS 远端仓的 SSH private key | `cat ~/.ssh/id_xxx` 内容粘贴 |
 | (可选) `PM_TRIGGER_TOKEN` | 防外部人乱触发 workflow_dispatch | 暂未启用, 预留 |
+
+### 当前已配置的 Secret (验证日 2026-09-17)
+
+```
+SOHO_DEPLOY_SSH_KEY  (历史, workflow 已不用)
+SOHO_GITHUB_TOKEN    (有效, PAT, admin:org + repo + workflow)
+```
+
+### 验证 Secrets
+
+```bash
+# 用 PAT 查仓列表
+curl -s -H "Authorization: token <PAT>" https://api.github.com/orgs/GobobCore/repos
+
+# 查 workflow secrets (需要 admin)
+curl -s -H "Authorization: token <PAT>" \
+  https://api.github.com/repos/GobobCore/Gobob-SOHO/actions/secrets
+```
 
 ### 不在 Secrets 里的
 
@@ -75,6 +94,14 @@ schedule:
 ```
 
 这个 cron 触发的 workflow 走 dry_run 逻辑,只扫 audit 不真推。
+
+### 已验证 (2026-09-17)
+
+- ✅ workflow `release.yml` dry_run=true 跑通 (`conclusion: success`)
+- ✅ audit-community 通过 (46 community/ 文件, 无 saas/)
+- ✅ audit-saas 通过 (49 saas/ 文件, 无 community/)
+- ✅ release-community / release-saas 脚本 dry-run 跑完
+- ✅ Notify job 在失败时自动创建 GitHub Issue
 
 ---
 

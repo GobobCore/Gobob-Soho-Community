@@ -50,14 +50,12 @@ if [[ -n $(git status --porcelain community/ shared/ docs/ scripts/release_commu
 fi
 echo "  ✓ 工作树干净"
 
-# 2. 检查 saas/ 在 git index 里 (确保不会 commit)
+# 2. 警告: monorepo 内有 saas/ 目录 (这是 monorepo 设计, 后面 hotfix 会撤回)
 echo ""
-echo "=== 2. 检查 saas/ 不在 git index 里 ==="
-if git ls-files saas/ | grep -q .; then
-    echo "  ❌ saas/ 文件在 git index 里, 必须先 git rm saas/ 才能继续"
-    exit 1
-fi
-echo "  ✓ saas/ 不在 git index 里"
+echo "=== 2. 检查 saas/ 在 monorepo 内的存在 (设计如此, hotfix 会撤回) ==="
+SAAS_IN_MONOREPO=$(git ls-files saas/ 2>/dev/null | wc -l)
+echo "  monorepo 内有 $SAAS_IN_MONOREPO 个 saas/ 文件 (正常, 后面 hotfix 撤回)"
+echo "  ⚠️  mirror push 会带这些文件到社区仓, hotfix step 会自动 git rm -rf saas/"
 
 # 3. Mirror push
 echo ""

@@ -37,10 +37,12 @@ if [[ "$TARGET" == "community" ]]; then
     REMOTE_REPO="git@github.com:GobobCore/Gobob-Soho-Community.git"
     EXCLUDED_PATTERN="saas/"        # 社区仓禁止含 saas/
     EXCLUDED_LABEL="SaaS 闭源目录"
+    MAIN_PATTERN="community/"        # 社区仓必须含 community/
 elif [[ "$TARGET" == "saas" ]]; then
     REMOTE_REPO="git@github.com:GobobCore/Gobob-Soho-SaaS.git"
     EXCLUDED_PATTERN="community/"   # SaaS 仓禁止含 community/
     EXCLUDED_LABEL="社区版开源目录"
+    MAIN_PATTERN="backend/"          # SaaS 仓主路径 (扁平化结构: backend/ + soho-ops/, 无 saas/ 顶层)
 fi
 
 cd "$SOHO_REPO"
@@ -140,11 +142,11 @@ else
     fi
 
     # 远端必须含主路径 (community 或 saas)
-    REMOTE_MAIN=$(git ls-tree -r FETCH_HEAD 2>/dev/null | grep -cE "\\b${TARGET}/" || true)
+    REMOTE_MAIN=$(git ls-tree -r FETCH_HEAD 2>/dev/null | grep -cE "\\b${MAIN_PATTERN}" || true)
     if [[ "$REMOTE_MAIN" -eq 0 ]]; then
-        error "远端 $TARGET 仓不含 ${TARGET}/ 路径 — mirror push 可能失败"
+        error "远端 $TARGET 仓不含 ${MAIN_PATTERN} 路径 — mirror push 可能失败"
     else
-        ok "远端 $TARGET 仓含 $REMOTE_MAIN 个 ${TARGET}/ 路径文件"
+        ok "远端 $TARGET 仓含 $REMOTE_MAIN 个 ${MAIN_PATTERN} 路径文件"
     fi
 fi
 echo ""

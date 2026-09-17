@@ -1,90 +1,68 @@
-# Gobob SOHO 三仓拆分说明 (R-Refactor 2026-09-17)
+# Gobob SOHO 三仓拆分说明 (R-Refactor 2026-09-17, 更新 2026-09-17 SaaS/社区物理隔离)
 
-> **本仓 (Gobob-SOHO)** 是开发 monorepo, 含 shared/ + community/ + cloud/ 三层。
-> Release 时用 subtree split 推到两个独立 GitHub repo (Community 公开 + SaaS 私有)。
+> **本仓 (Gobob-SOHO)** 是开发 monorepo, 含 `shared/` + `community/` + `saas/` 三层。
+> Release 时用 `scripts/release_*.sh` 推到两个独立 GitHub repo (Community 公开 + SaaS 私有)。
 
 ---
 
-## 三仓分工
+## 三仓分工 (2026-09-17 物理隔离后)
 
 | 仓 | 内容 | License | GitHub URL | 端口 |
 |---|---|---|---|---|
-| **`Gobob-SOHO`** (本仓, monorepo) | 全部三层, 开发用 | (内部, 不发布) | intsch Gitea | — |
+| **`Gobob-SOHO`** (本仓, monorepo) | shared/ + community/ + saas/ 三层 | (内部, 不发布) | intsch Gitea | — |
 | **`Gobob-Soho-Community`** | community/ + shared/ (扁平) | Apache-2.0 | github.com/GobobCore/Gobob-Soho-Community | 19011/19012/19013 |
-| **`Gobob-Soho-SaaS`** | cloud/ + shared/ (扁平) | proprietary (private) | github.com/GobobCore/Gobob-Soho-SaaS | 19001/19002/19003/19004 |
+| **`Gobob-Soho-SaaS`** | saas/ + shared/ (扁平) | proprietary (private) | github.com/GobobCore/Gobob-Soho-SaaS | 19001/19002/19003/19004 |
+
+### 🔴 SaaS 与社区版代码边界(物理隔离,2026-09-17 落地)
+
+| 维度 | SaaS 版 (saas/) | 社区版 (community/) |
+|------|----------------|---------------------|
+| **后端入口** | `saas/backend/main.py` (自带 saas_admin + billing router) | `community/backend/main.py` (只用 shared 核心) |
+| **平台前端** | `saas/app/index.html` (brand: "SaaS 多机构版") | `community/app/index.html` (brand: "社区开源自托管版") |
+| **运营后台** | `saas/soho-ops/index.html` | — (社区版无运营后台,本机 owner 角色自管) |
+| **获客 portal** | 暂共用 `community/portal` (19002,Next.js) | `community/portal` (19012,Next.js) |
+| **DB** | `gobob_soho` (多机构 + 计费表) | `gobob_soho_community` (单机构) |
+| **systemd** | `gobob-soho-{backend,app,ops}.service` → `saas/` | `gobob-soho-community-{backend,app,portal}.service` → `community/` |
+| **共用** | `shared/backend-core/` (业务核心, 两版都必须相同) | 同左 |
+
+**绝不共用**:
+- `saas/app/` ≠ `community/app/`(独立两份,品牌/文案不同)
+- `saas/backend/api/{saas_admin,billing}.py` ≠ 任何 community 文件
+- systemd unit 配置文件 (`~/.config/systemd/user/gobob-soho*.service`) 一一对应 saas 或 community,**不允许混用**
 
 ---
 
 ## 拆分流程 (release 时)
 
-### 1. 拆分社区版 → 推 Community repo
+**简化版**: 用 `scripts/release_community.sh` 和 `scripts/release_saas.sh` 一键搞定,不再手动 subtree split。
+
+### 1. 推社区版 (community/ + shared/)
 
 ```bash
 cd /home/ricky/.openclaw/workspace/gobob-soho
-
-# 1.1 创建独立分支 (clean 历史, 只含 community/ 改动)
-git subtree split --prefix=community --annotate="(community)" -b community-only
-
-# 1.2 加 shared/ (复制 main 仓根目录的 shared/ 到 community-only 根)
-git checkout community-only
-git checkout main -- shared/  # 拷贝 shared 到 community-only 根
-
-# 1.3 调整路径: community/ 提到根 (subtree split 已做)
-#      backend/main.py  路径调整 (community/backend → backend)
-#      deploy/Dockerfile.* 路径调整
-#      .env.example 端口 19001/02/03 → 19011/12/13
-#      README 指向 Community repo
-#      .gitignore 加 community/ + cloud/ 保护
-
-# 1.4 commit + push
-git add -A
-git commit -m "R-Refactor: 拆分到独立 repo — community 版扁平化 + shared/ 内嵌"
-git remote add community-publish git@github.com:GobobCore/Gobob-Soho-Community.git
-git push community-publish community-only:main --force
+./scripts/release_community.sh                # 推到 community-publish/main
+./scripts/release_community.sh --dry-run      # 验证流程但不真推
 ```
 
-### 2. 拆分 SaaS → 推 SaaS repo
+### 2. 推 SaaS 版 (saas/ + shared/)
 
 ```bash
-# 2.1 cloud/ 在 .gitignore 里, git subtree split 找不到 → 用 orphan 分支手动 cp
-git checkout --orphan saas-publish
-mkdir -p backend/api tests soho-ops/js
-cp cloud/backend-saas/main.py backend/main.py
-cp cloud/backend-saas/api/saas_admin.py backend/saas_admin.py
-cp cloud/backend-saas/api/billing.py backend/billing.py
-cp cloud/backend-saas/api/__init__.py backend/api/__init__.py
-cp cloud/backend-saas/tests/test_billing_logic.py tests/test_billing_logic.py
-cp cloud/soho-ops/* soho-ops/
-cp cloud/soho-ops/js/* soho-ops/js/
-cp -r shared .   # 共享业务核心
-
-# 2.2 写 SaaS 专属配置
-cat > .env.example << 'EOF'
-# SaaS 端口 19001/02/03/04 (跟社区版区分)
-SOHO_BACKEND_PORT=19001
-SOHO_PORTAL_PORT=19002
-SOHO_APP_PORT=19003
-SOHO_OPS_PORT=19004
-# ... 见仓库内 .env.example
-EOF
-
-# 2.3 commit + push
-git add -A
-git commit -m "Initial: Gobob SOHO SaaS Edition — 独立 repo 拆分"
-git remote add saas-publish git@github.com:GobobCore/Gobob-Soho-SaaS.git
-git push saas-publish saas-publish:main --force
+cd /home/ricky/.openclaw/workspace/gobob-soho
+./scripts/release_saas.sh                     # 推到 saas-publish/main
+./scripts/release_saas.sh --dry-run           # 验证流程但不真推
 ```
 
 ### 3. 后续开发同步
 
 ```bash
-# 本仓改完, 推到两个独立 repo
-git push origin main                                       # 主仓 (intsch Gitea)
-git push community-publish community-only:main --force     # Community
-git push saas-publish saas-publish:main --force            # SaaS
+# 本仓改完, 推到三个远端
+git push origin main                            # 主仓 (GitHub Gobob-SOHO, 内部 monorepo)
+./scripts/release_community.sh                 # Community (Apache-2.0 公开)
+./scripts/release_saas.sh                      # SaaS (proprietary 私有)
 ```
 
-> 注: 实际生产用 GitHub Actions 自动跑 split + push, 不用每次手动。
+> ⚠️ **不要直接 `git subtree push`** — 用脚本,脚本里有敏感信息扫描和路径校验。
+> ⚠️ **本仓改动后必须先 commit** — release 脚本会检查工作树干净。
 
 ---
 
@@ -126,4 +104,11 @@ git push saas-publish saas-publish:main --force            # SaaS
 
 ---
 
-**Last updated**: 2026-09-17 (cecilia, 三仓拆分完成)
+**Last updated**: 2026-09-17 16:00 (cecilia + Claude, SaaS/社区版物理隔离 + cloud→saas 改名 + release 脚本化)
+
+**关键变更 (vs 上一版)**:
+- `cloud/` → `saas/`(避免"cloud=闭源"的隐喻混淆)
+- `community/app/` 与 `saas/app/` 物理隔离,brand 文案各自维护
+- systemd unit (`gobob-soho-{backend,app,ops}.service`) 全部指向 `saas/` 路径,不再用 community 代码兜底
+- 发布脚本化:`scripts/release_community.sh` `scripts/release_saas.sh` 替代手动 subtree
+- 后续 PM / cecilia 改 SaaS 走 saas/,改社区走 community/,**绝不允许跨边界混改**

@@ -7,6 +7,7 @@
   const app = createApp({
     components: {
       "login-view": V.LoginView,
+      "register-view": V.RegisterView,
       "dashboard-view": V.DashboardView,
       "leads-view": V.LeadsView,
       "lead-detail": V.LeadDetail,
@@ -29,6 +30,8 @@
         loggedIn: !!S.getToken(),  // 响应式登录态
         toast: { msg: "", type: "ok" },
         user: S.getUser() || {},
+        // R-Refactor 2026-09-17: 未登录态下显示 login 或 register (由 hash 决定)
+        authView: (location.hash.replace(/^#\//, "") === "register") ? "register" : "login",
         // Phase 5: 家长多学生切换
         myStudents: [],          // 家长关联的所有学生
         activeStudentId: null,   // 当前选中的学生
@@ -152,11 +155,21 @@
         this.loadMyStudents();  // Phase 5
         const allowed = this.navGroups.flatMap(g => g.items.map(i => i.view));
         this.currentView = allowed.includes(h) ? h : (this.isStaffNow ? "dashboard" : "my-progress");
+      } else if (h === "register") {
+        this.authView = "register";
+      } else {
+        this.authView = "login";
       }
       window.addEventListener("hashchange", () => {
         const v = location.hash.replace(/^#\//, "");
-        const allowed = this.navGroups.flatMap(g => g.items.map(i => i.view));
-        if (this.loggedIn && allowed.includes(v)) this.currentView = v;
+        if (this.loggedIn) {
+          const allowed = this.navGroups.flatMap(g => g.items.map(i => i.view));
+          if (allowed.includes(v)) this.currentView = v;
+        } else if (v === "register") {
+          this.authView = "register";
+        } else if (v === "login" || v === "") {
+          this.authView = "login";
+        }
       });
     },
   });
@@ -164,6 +177,7 @@
   // 全局注册所有视图（含子组件 lead-detail / student-detail），
   // 解决 views.js 里"先用后定义"导致局部 components 快照为 undefined 的问题。
   app.component("login-view", V.LoginView);
+  app.component("register-view", V.RegisterView);
   app.component("dashboard-view", V.DashboardView);
   app.component("leads-view", V.LeadsView);
   app.component("lead-detail", V.LeadDetail);

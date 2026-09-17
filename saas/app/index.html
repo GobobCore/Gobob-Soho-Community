@@ -60,8 +60,9 @@
   <div class="h-1 bg-gradient-to-r from-[#E08A44] via-[#E59E56] to-[#C97636]"></div>
 
   <div id="app" v-cloak>
-    <!-- 未登录：登录页 -->
-    <login-view v-if="!loggedIn" @logged-in="onLoggedIn"></login-view>
+    <!-- 未登录：登录页 / 注册页 (由 hash 路由切换) -->
+    <login-view v-if="!loggedIn && authView === 'login'" @logged-in="onLoggedIn"></login-view>
+    <register-view v-else-if="!loggedIn && authView === 'register'"></register-view>
 
     <!-- 已登录：主框架 -->
     <div v-else class="flex min-h-screen">

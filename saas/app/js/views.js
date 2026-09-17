@@ -38,9 +38,7 @@
   // ════════════════════════════════════════════════════════════
   const LoginView = defineComponent({
     emits: ["logged-in"],
-    data: () => ({ username: "", password: "", loading: false, err: "",
-      registerUrl: (typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:19002/register` : "/register"),
-    }),
+    data: () => ({ username: "", password: "", loading: false, err: "" }),
     // R-Refactor 2026-09-17: SaaS 正式版登录页 (去掉 demo 提示 + 一键填入)
     template: `
     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
@@ -64,7 +62,7 @@
           </button>
           <div class="text-center text-xs text-slate-400 pt-1">
             还没有账号？
-            <a :href="registerUrl" target="_blank" class="text-blue-600 hover:underline">自助注册机构</a>
+            <a href="#/register" class="text-blue-600 hover:underline">自助注册机构</a>
           </div>
         </div>
       </div>
@@ -77,6 +75,88 @@
           const d = await S().post("/api/login", { username: this.username, password: this.password });
           S().setAuth(d.token, d.user);
           this.$emit("logged-in");
+        } catch (e) { this.err = e.message; }
+        this.loading = false;
+      },
+    },
+  });
+
+  // ════════════════════════════════════════════════════════════
+  // 自助注册机构 (SaaS 多机构版注册入口)
+  // ════════════════════════════════════════════════════════════
+  const RegisterView = defineComponent({
+    emits: ["registered", "goto-login"],
+    data: () => ({
+      org_name: "", owner_name: "",
+      username: "", password: "",
+      contact_phone: "", contact_email: "",
+      loading: false, err: "", ok: false,
+    }),
+    template: `
+    <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
+      <div class="w-full max-w-md bg-white rounded-2xl shadow-lg p-8">
+        <div class="flex items-center gap-2 mb-1">
+          <img src="/logo.svg" class="w-9 h-9" />
+          <div class="font-bold text-lg">Gobob Soho</div>
+          <span class="ml-auto text-[10px] uppercase tracking-wider px-2 py-0.5 bg-blue-100 text-blue-700 rounded">SaaS 多机构版</span>
+        </div>
+        <div class="text-sm text-slate-400 mb-6">注册新机构 · 14 天免费试用</div>
+
+        <div v-if="ok" class="text-center py-8">
+          <div class="text-emerald-600 text-lg font-semibold mb-2">✓ 注册成功</div>
+          <div class="text-sm text-slate-500 mb-4">机构已创建, 即将跳转到登录页</div>
+        </div>
+
+        <template v-else>
+        <div class="space-y-3">
+          <input v-model="org_name" placeholder="机构名称 (例: 我的留学工作室)" maxlength="100"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          <input v-model="owner_name" placeholder="老板/主管姓名" maxlength="50"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          <input v-model="username" placeholder="登录用户名 (3-32 位字母/数字)" maxlength="32" pattern="[a-zA-Z0-9_.-]+"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none" />
+          <input v-model="password" type="password" placeholder="密码 (≥ 8 位)" maxlength="64"
+                 class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          <div class="grid grid-cols-2 gap-3">
+            <input v-model="contact_phone" placeholder="手机 (选填)" maxlength="50"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            <input v-model="contact_email" type="email" placeholder="邮箱 (选填)" maxlength="200"
+                   class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+          </div>
+          <div v-if="err" class="text-sm text-red-500">{{ err }}</div>
+          <button @click="doRegister" :disabled="loading || !canSubmit"
+                  class="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2.5 text-sm font-medium disabled:opacity-50">
+            {{ loading ? '注册中…' : '创建机构账号' }}
+          </button>
+          <div class="text-center text-xs text-slate-400 pt-1">
+            已有账号？
+            <a href="#/login" class="text-blue-600 hover:underline">去登录</a>
+          </div>
+        </div>
+        </template>
+      </div>
+    </div>`,
+    computed: {
+      canSubmit() {
+        return this.org_name.length >= 2 && this.owner_name.length >= 1
+          && /^[a-zA-Z0-9_.-]{3,32}$/.test(this.username) && this.password.length >= 8;
+      },
+    },
+    methods: {
+      async doRegister() {
+        if (!this.canSubmit) { this.err = "请填写完整 (机构名/姓名/用户名≥3位/密码≥8位)"; return; }
+        this.loading = true; this.err = "";
+        try {
+          await S().post("/api/register", {
+            org_name: this.org_name,
+            username: this.username,
+            password: this.password,
+            owner_name: this.owner_name,
+            contact_phone: this.contact_phone || undefined,
+            contact_email: this.contact_email || undefined,
+          });
+          this.ok = true;
+          setTimeout(() => { location.hash = "#/login"; location.reload(); }, 1200);
         } catch (e) { this.err = e.message; }
         this.loading = false;
       },
@@ -1506,7 +1586,7 @@
 
   // 注册到全局
   window.SohoViews = {
-    LoginView, DashboardView, LeadsView, LeadDetail, StudentsView, StudentDetail,
+    LoginView, RegisterView, DashboardView, LeadsView, LeadDetail, StudentsView, StudentDetail,
     ContractsView, StaffView, CollisionsView, ReportsView, SettingsView,
     MyProgressView, MyTasksView, MyContractView, MessagesView, NotificationsView,
   };

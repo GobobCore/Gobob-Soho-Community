@@ -107,11 +107,11 @@ export default function Home() {
             <div className="relative">
               <h2 className="text-2xl font-bold tracking-tight">我是机构</h2>
               <p className="mt-2 text-slate-600 text-sm">开通专属工作台，管线索、管学生、管签约</p>
-              <Link href="/register" className="mt-5 inline-flex items-center gap-2 text-primary-700 font-semibold border-2 border-primary-200 hover:border-primary-400 hover:bg-primary-50 px-6 py-3 rounded-xl transition-all text-base">
-                注册并开始 14 天免费试用
+              <Link href="http://192.168.1.5:19003" target="_blank" className="mt-5 inline-flex items-center gap-2 text-primary-700 font-semibold border-2 border-primary-200 hover:border-primary-400 hover:bg-primary-50 px-6 py-3 rounded-xl transition-all text-base">
+                进入机构工作台
                 <ArrowRight className="w-5 h-5" />
               </Link>
-              <p className="mt-3 text-xs text-slate-400">1-2 个协作账号免费，3 个及以上 ¥1000/账号/年</p>
+              <p className="mt-3 text-xs text-slate-400">在工作台内可自助注册机构账号</p>
             </div>
           </div>
         </div>

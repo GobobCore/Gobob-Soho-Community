@@ -1337,16 +1337,87 @@
   const SettingsView = defineComponent({
     components: { Card },
     props: ["ctx"],
-    data: () => ({ user: null }),
+    data: () => ({
+      user: null,
+      org: null,
+      isOwner: false,
+      loading: true,
+      saving: false,
+      err: "",
+      ok: "",
+      form: { name: "", description: "", address: "", phone: "", email: "", website: "", logo_url: "" },
+    }),
     template: `
     <div>
       <h1 class="text-xl font-bold mb-4">设置</h1>
-      <card title="机构与账号">
+
+      <!-- 机构信息 — owner 可编辑, 其他角色只读 -->
+      <card title="机构信息">
+        <div v-if="loading" class="text-sm text-slate-400">加载中…</div>
+        <template v-else>
+          <div class="space-y-3">
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">机构名称 <span class="text-red-500">*</span></label>
+              <input v-model="form.name" :disabled="!isOwner" placeholder="例: 我的留学工作室"
+                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500" />
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">机构简介</label>
+              <textarea v-model="form.description" :disabled="!isOwner" rows="3" placeholder="机构业务范围、特色等"
+                        class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500"></textarea>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">商务地址</label>
+                <input v-model="form.address" :disabled="!isOwner" placeholder="例: 北京市朝阳区..."
+                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500" />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">公开联系电话</label>
+                <input v-model="form.phone" :disabled="!isOwner" placeholder="010-xxxx-xxxx"
+                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500" />
+              </div>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">公开联系邮箱</label>
+                <input v-model="form.email" :disabled="!isOwner" type="email" placeholder="contact@example.com"
+                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500" />
+              </div>
+              <div>
+                <label class="block text-xs text-slate-500 mb-1">官方网站</label>
+                <input v-model="form.website" :disabled="!isOwner" placeholder="https://example.com"
+                       class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500" />
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-500 mb-1">机构 Logo URL</label>
+              <input v-model="form.logo_url" :disabled="!isOwner" placeholder="https://..."
+                     class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none disabled:bg-slate-100 disabled:text-slate-500" />
+            </div>
+          </div>
+          <div v-if="err" class="text-sm text-red-500 mt-3">{{ err }}</div>
+          <div v-if="ok" class="text-sm text-emerald-600 mt-3">{{ ok }}</div>
+          <div v-if="isOwner" class="mt-4 flex items-center gap-3">
+            <button @click="save" :disabled="saving || !form.name.trim()"
+                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50">
+              {{ saving ? '保存中…' : '保存机构信息' }}
+            </button>
+            <span v-if="!isOwner" class="text-xs text-slate-400">（只读, 非 owner）</span>
+          </div>
+          <div v-else class="text-xs text-slate-400 mt-2">仅 owner 可编辑机构信息</div>
+        </template>
+      </card>
+
+      <!-- 当前账号 (只读) -->
+      <card title="当前账号" class="mt-4">
         <div class="text-sm space-y-2">
-          <div><span class="text-slate-400">当前账号</span> {{ user && user.name }}（{{ user && user.username }}）</div>
-          <div><span class="text-slate-400">角色</span> {{ user && user.role }}</div>
+          <div><span class="text-slate-400">账号</span> {{ user && user.name }}（{{ user && user.username }}）</div>
+          <div><span class="text-slate-400">角色</span> {{ user && user.role }} <span v-if="!isOwner" class="text-xs text-slate-400">(只读)</span></div>
         </div>
       </card>
+
+      <!-- Gobob 数据 API 说明 -->
       <card title="Gobob 数据 API" class="mt-4">
         <div class="text-sm text-slate-500">
           智能评估 / 院校数据由 Gobob Data API 提供。API Key 在后端环境变量 <code class="bg-slate-100 px-1 rounded">GOBOB_API_KEY</code> 配置，
@@ -1354,7 +1425,47 @@
         </div>
       </card>
     </div>`,
-    mounted() { this.user = S().getUser(); },
+    computed: {
+      // owner 才能编辑 — SaaS 跟 community 都用此视图, owner-only 写更安全
+    },
+    methods: {
+      async load() {
+        this.loading = true; this.err = "";
+        try {
+          const u = S().getUser();
+          this.user = u;
+          this.isOwner = u && u.role === "owner";
+          const data = await S().get("/api/orgs/me");
+          this.org = data;
+          this.form = {
+            name: data.name || "",
+            description: data.description || "",
+            address: data.address || "",
+            phone: data.phone || "",
+            email: data.email || "",
+            website: data.website || "",
+            logo_url: data.logo_url || "",
+          };
+        } catch (e) { this.err = "加载失败: " + e.message; }
+        this.loading = false;
+      },
+      async save() {
+        this.saving = true; this.err = ""; this.ok = "";
+        try {
+          // PUT 走 PATCH 语义 — 只发非空字段 (空字符串会被后端忽略)
+          const body = {};
+          for (const k of Object.keys(this.form)) {
+            const v = this.form[k];
+            if (v && v.trim()) body[k] = v;
+          }
+          const r = await S().put("/api/orgs/me", body);
+          this.ok = `已更新 ${r.updated} 项`;
+          await this.load();
+        } catch (e) { this.err = "保存失败: " + e.message; }
+        this.saving = false;
+      },
+    },
+    mounted() { this.load(); },
   });
 
   // ════════════════════════════════════════════════════════════

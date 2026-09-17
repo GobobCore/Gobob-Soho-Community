@@ -16,8 +16,20 @@ SET NAMES utf8mb4;
 CREATE TABLE IF NOT EXISTS orgs (
     id          VARCHAR(64) PRIMARY KEY,
     name        VARCHAR(200) NOT NULL,
+    slug        VARCHAR(64) UNIQUE DEFAULT NULL,
+    address     VARCHAR(500) DEFAULT NULL,
+    phone       VARCHAR(50) DEFAULT NULL,
+    email       VARCHAR(200) DEFAULT NULL,
+    website     VARCHAR(500) DEFAULT NULL,
+    logo_url    VARCHAR(500) DEFAULT NULL,
+    description TEXT DEFAULT NULL,
+    contact_name VARCHAR(100) DEFAULT NULL,
     -- Gobob Data API 授权（也可放 env，这里支持未来多机构各自配 Key）
     gobob_api_key VARCHAR(128) DEFAULT NULL,
+    settings    JSON DEFAULT NULL,
+    plan_status ENUM('free','trial','paid','suspended') NOT NULL DEFAULT 'free',
+    seats_paid  INT NOT NULL DEFAULT 0,
+    paid_until  DATE DEFAULT NULL,
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

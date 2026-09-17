@@ -75,7 +75,7 @@ else
     HOTFIX_BRANCH="hotfix-rm-saas-leak-$(date +%H%M%S)"
     # 在 monorepo 上从 community-publish 拉最新, 删 saas/, push 回 community-publish
     git fetch "$COMMUNITY_REPO" "$BRANCH" 2>&1 | tail -1
-    git checkout -b "$HOTFIX_BRANCH" "$COMMUNITY_REPO/$BRANCH" 2>&1 | tail -1
+    git checkout -b "$HOTFIX_BRANCH" FETCH_HEAD 2>&1 | tail -1
     SAAS_COUNT=$(git ls-files saas/ 2>/dev/null | wc -l)
     if [[ "$SAAS_COUNT" -gt 0 ]]; then
         git rm -rf saas/ 2>&1 | tail -2

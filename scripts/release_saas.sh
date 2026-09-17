@@ -84,7 +84,7 @@ if [[ -n "$DRY_RUN" ]]; then
 else
     HOTFIX_BRANCH="hotfix-rm-community-leak-$(date +%H%M%S)"
     git fetch "$SAAS_REPO" "$BRANCH" 2>&1 | tail -1
-    git checkout -b "$HOTFIX_BRANCH" "$SAAS_REPO/$BRANCH" 2>&1 | tail -1
+    git checkout -b "$HOTFIX_BRANCH" FETCH_HEAD 2>&1 | tail -1
     COMM_COUNT=$(git ls-files community/ 2>/dev/null | wc -l)
     if [[ "$COMM_COUNT" -gt 0 ]]; then
         git rm -rf community/ 2>&1 | tail -2

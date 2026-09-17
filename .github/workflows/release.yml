@@ -53,37 +53,32 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - name: Setup SSH key
-        if: env.SOHO_DEPLOY_SSH_KEY != ''
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SOHO_DEPLOY_SSH_KEY }}
-
-      - name: Checkout (SSH)
+      - name: Checkout (SSH, 用 SOHO 仓的 deploy key)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ssh-key: ${{ secrets.SOHO_DEPLOY_SSH_KEY }}
 
-      - name: Configure git
+      - name: Configure git + HTTPS remotes (用 PAT 鉴权, 避免 SSH key 多仓问题)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin git@github.com:GobobCore/Gobob-SOHO.git
-
-      - name: Pre-fetch all remotes
-        run: |
-          # 预先 fetch 3 个仓 (用 SSH key 一次, 后续 audit 直接读本地 refs)
-          git remote add audit-community git@github.com:GobobCore/Gobob-Soho-Community.git
-          git remote add audit-saas git@github.com:GobobCore/Gobob-Soho-SaaS.git
+          # 用 PAT 鉴权 (HTTPS URL), 单一 secret 适用所有 3 个仓
+          git remote add audit-community "https://x-access-token:${SOHO_GITHUB_TOKEN}@github.com/GobobCore/Gobob-Soho-Community.git"
+          git remote add audit-saas "https://x-access-token:${SOHO_GITHUB_TOKEN}@github.com/GobobCore/Gobob-Soho-SaaS.git"
           git fetch audit-community main
           git fetch audit-saas main
+        env:
+          SOHO_GITHUB_TOKEN: ${{ secrets.SOHO_GITHUB_TOKEN }}
 
       # Audit community release
       - name: Audit for community release
         run: |
           echo "===== audit: community ====="
           bash scripts/push_audit.sh community
+        env:
+          SOHO_GITHUB_TOKEN: ${{ secrets.SOHO_GITHUB_TOKEN }}
         continue-on-error: false
 
       # Audit SaaS release
@@ -91,6 +86,8 @@ jobs:
         run: |
           echo "===== audit: saas ====="
           bash scripts/push_audit.sh saas
+        env:
+          SOHO_GITHUB_TOKEN: ${{ secrets.SOHO_GITHUB_TOKEN }}
         continue-on-error: false
 
   release-community:

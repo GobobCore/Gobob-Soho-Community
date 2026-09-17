@@ -38,7 +38,9 @@
   // ════════════════════════════════════════════════════════════
   const LoginView = defineComponent({
     emits: ["logged-in"],
-    data: () => ({ username: "", password: "", loading: false, err: "" }),
+    data: () => ({ username: "", password: "", loading: false, err: "",
+      registerUrl: (typeof window !== "undefined" ? `${window.location.protocol}//${window.location.hostname}:19002/register` : "/register"),
+    }),
     // R-Refactor 2026-09-17: SaaS 正式版登录页 (去掉 demo 提示 + 一键填入)
     template: `
     <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-slate-100 p-4">
@@ -62,7 +64,7 @@
           </button>
           <div class="text-center text-xs text-slate-400 pt-1">
             还没有账号？
-            <a href="/api/register" class="text-blue-600 hover:underline">自助注册机构</a>
+            <a :href="registerUrl" target="_blank" class="text-blue-600 hover:underline">自助注册机构</a>
           </div>
         </div>
       </div>

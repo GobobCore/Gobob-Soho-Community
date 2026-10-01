@@ -12,8 +12,8 @@
 ## 1. 克隆 + 准备
 
 ```bash
-git clone https://github.com/GobobCore/Gobob-SOHO.git
-cd Gobob-SOHO
+git clone https://github.com/GobobCore/Gobob-Soho-Community.git
+cd Gobob-Soho-Community
 ```
 
 ## 2. Python 虚拟环境 + 依赖

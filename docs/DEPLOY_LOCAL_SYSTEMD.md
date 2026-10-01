@@ -257,7 +257,7 @@ systemctl --user stop gobob-soho-community-portal
 | Gobob backend 18797 `/api/smb/v1/*` | 智能评估 / 院校数据 | 仅评估和院校下拉不可用, 核心业务不影响 |
 | 本机 MySQL 3306 | gobob_soho 库 | 全站挂 |
 
-**Gobob 侧 SMB Key 管理**: 用 Gobob admin token 调 `POST /api/api-keys` 创建, scope 用 `smb:*`,写进 `GOBOB_API_KEY` env。当前生产 Key: id=39 `Gobob-SOHO-本机部署`。
+**Gobob 侧 SMB Key 管理**: 用 Gobob admin token 调 `POST /api/api-keys` 创建, scope 用 `smb:*`,写进 `GOBOB_API_KEY` env。为你的部署单独建一个 key 并妥善保管（key 本身是计费凭据，切勿提交到仓库）。
 
 ---
 

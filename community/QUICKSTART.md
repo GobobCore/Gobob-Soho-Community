@@ -6,8 +6,8 @@
 ## 1. 准备 (1 分钟)
 
 ```bash
-# 假设你已经 clone 了 Gobob-SOHO 仓库
-cd Gobob-SOHO
+# 假设你已经 clone 了 Gobob-Soho-Community 仓库
+cd Gobob-Soho-Community
 
 # Python 3.11+ (后端)
 python3 -m venv .venv

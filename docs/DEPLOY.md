@@ -15,8 +15,8 @@
 ## 快速开始
 
 ```bash
-git clone https://github.com/GobobCore/Gobob-SOHO.git
-cd Gobob-SOHO/community/deploy
+git clone https://github.com/GobobCore/Gobob-Soho-Community.git
+cd Gobob-Soho-Community/community/deploy
 
 # 准备 env (从 example 复制)
 cp ../.env.example .env
@@ -103,7 +103,7 @@ Gobob SOHO 的智能评估/院校数据由 Gobob 主站 `/api/smb/v1/*` 提供�
 ## 仓库拆分说明 (R-Refactor 2026-09-16)
 
 ```
-Gobob-SOHO/
+Gobob-Soho-Community/
 ├── shared/backend-core/    # 业务核心 (社区版 + SaaS 共用)
 ├── community/              # 开源版 (本指南)
 │   ├── backend/main.py     # 社区版入口

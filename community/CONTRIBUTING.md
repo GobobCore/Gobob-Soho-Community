@@ -12,7 +12,7 @@ By contributing, you agree your contributions will be licensed under the same.
 This is the **community edition** of Gobob SOHO. The repo has 3 top-level areas:
 
 ```
-Gobob-SOHO/
+Gobob-Soho-Community/
 ├── shared/                # 业务核心 (本仓库所有改动 90% 在这里)
 │   └── backend-core/
 │       ├── api/           # 14 个业务路由
@@ -45,8 +45,8 @@ Gobob-SOHO/
 
 ```bash
 # 1. fork + clone
-git clone https://github.com/your-fork/Gobob-SOHO.git
-cd Gobob-SOHO
+git clone https://github.com/your-fork/Gobob-Soho-Community.git
+cd Gobob-Soho-Community
 
 # 2. 创建 feature 分支
 git checkout -b feat/your-feature

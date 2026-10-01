@@ -41,8 +41,8 @@ SOHO 只调 Gobob Data API (院校/专业/排名/匹配算法), 业务核心 (�
 ### 1. 克隆 + 准备
 
 ```bash
-git clone https://github.com/GobobCore/Gobob-SOHO.git
-cd Gobob-SOHO
+git clone https://github.com/GobobCore/Gobob-Soho-Community.git
+cd Gobob-Soho-Community
 cp community/.env.example .env
 # 编辑 .env 填密码 + (可选) Gobob API Key
 ```
@@ -75,7 +75,7 @@ docker compose up -d
 ## 仓库结构 (社区版)
 
 ```
-Gobob-SOHO/                          # 本仓库 (Apache-2.0)
+Gobob-Soho-Community/                          # 本仓库 (Apache-2.0)
 ├── shared/                          # 业务核心 — 社区版和 SaaS 版共用
 │   └── backend-core/                # FastAPI 业务路由 + core 模块
 │       ├── api/                     # 14 个业务路由 (leads/contracts/students/...)

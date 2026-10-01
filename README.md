@@ -1,18 +1,5 @@
-# Gobob SOHO — Development Monorepo (Internal)
+# Gobob SOHO — Community Edition
 
-> ⚠️ **本仓是开发 monorepo** — 含 `shared/` + `community/` + `cloud/` 三层, **不直接发布**。
->
-> 三个仓分工 (R-Refactor 2026-09-17):
->
-> | 仓 | 用途 | License | GitHub |
-> |---|---|---|---|
-> | **本仓 `Gobob-SOHO`** | 开发 monorepo, 三层全在内 | (内部, 不发布) | intsch Gitea |
-> | **`Gobob-Soho-Community`** | 开源社区版, 推到 GitHub | Apache-2.0 | [github.com/GobobCore/Gobob-Soho-Community](https://github.com/GobobCore/Gobob-Soho-Community) |
-> | **`Gobob-Soho-SaaS`** | SaaS 闭源版, 推到 GitHub (private) | proprietary | [github.com/GobobCore/Gobob-Soho-SaaS](https://github.com/GobobCore/Gobob-Soho-SaaS) (private) |
->
-> 开发改本仓 → release 时推到两个独立 repo (见 `docs/REPO_SPLIT.md` 拆分脚本)。
-
----
 
 **面向中小型留学机构与语言培训工作室的业务管理系统**。
 覆盖完整闭环：**获客（智能评估引流）→ 线索/生源管理 → 签约 → 留学进程服务 → 老师协作与换师 → 老板管理视图**。
@@ -51,10 +38,7 @@ Gobob SOHO 是一个**独立部署、独立数据库**的业务管理系统，�
                 Gobob Data API  (/api/smb/v1/*)   ← 院校/专业/匹配 数据
 ```
 
-> 仓库采用 shared/ + community/ + cloud/ 三层结构 (R-Refactor 2026-09-16):
-> - `shared/backend-core/` — 业务核心 (社区版 + SaaS 版共用)
-> - `community/` — 开源版 (推到 GitHub `Gobob-Soho-Community`, Apache-2.0)
-> - `cloud/` — SaaS 闭源 (推到 GitHub `Gobob-Soho-SaaS` private, proprietary)
+**仓库结构**：`shared/backend-core/` 是 FastAPI 业务核心（FastAPI 路由 + MySQL schema + Gobob Data API 客户端），`community/` 是本社区版的部署入口与前端（Next.js 获客门户 + Vue 3 服务平台 + docker-compose）。
 
 ---
 
@@ -86,14 +70,14 @@ docker compose up -d                    # 起 mysql + backend + portal + app
 ## 仓库结构
 
 ```
-Gobob-SOHO/                            # 本仓库 (Apache-2.0)
-├── shared/                            # 业务核心 (社区版 + SaaS 版共用)
+Gobob-Soho-Community/                 # 本仓库 (Apache-2.0)
+├── shared/                            # 业务核心
 │   └── backend-core/                  # FastAPI 业务路由 + core 模块
 │       ├── api/                       # 14 个业务路由 (leads/contracts/students/...)
 │       ├── core/                      # 6 个基础模块 (id_gen/auth/database/tenancy/gobob_client/config)
 │       ├── sql/                       # schema.sql + seed.sql
 │       └── main.py                    # FastAPI 工厂
-├── community/                         # 开源版 (推到 GitHub)
+├── community/                         # 社区版部署入口与前端
 │   ├── backend/main.py                # 开源版入口 (无 SaaS 计费/多机构)
 │   ├── portal/                        # Next.js 14 获客门户
 │   ├── app/                           # Vue 3 SPA 服务平台
@@ -101,7 +85,6 @@ Gobob-SOHO/                            # 本仓库 (Apache-2.0)
 │   ├── README.md                      # 社区版专属说明
 │   ├── QUICKSTART.md                  # 本机裸机 5 分钟
 │   └── LICENSE                        # Apache-2.0
-├── cloud/                             # SaaS 闭源 (本地 Gitea, 不上 GitHub)
 └── docs/                              # 部署 / 配置 / API / 贡献文档
 ```
 
@@ -119,8 +102,6 @@ Gobob-SOHO/                            # 本仓库 (Apache-2.0)
 - [配置说明](docs/CONFIG.md)
 - [API 说明](docs/API.md)
 
-**仓库策略**:
-- [SaaS 闭源 vs 开源拆分说明](docs/SPLIT_PLAN_SAAS_VS_COMMUNITY_2026-09-16.md)
 - [仓库策略 (三仓分工)](docs/REPO_SPLIT.md) — 本仓 + Community + SaaS
 - [仓库策略 (不开独立 repo, 历史)](docs/REPO_STRATEGY_2026-09-16.md)
 

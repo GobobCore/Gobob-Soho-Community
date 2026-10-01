@@ -170,7 +170,12 @@ export default function RegisterPage() {
               <CheckCircle2 className="w-3.5 h-3.5" />
               1-2 个协作账号免费，3 个及以上 ¥1000/账号/年
             </div>
-            <div>注册即表示同意 <Link href="#" className="text-primary-600 hover:underline">服务条款</Link> 和 <Link href="/privacy" className="text-primary-600 hover:underline">隐私政策</Link></div>
+            <div>
+              提交注册前请阅读
+              <Link href="/terms" className="text-primary-600 hover:underline">服务条款</Link>
+              与
+              <Link href="/privacy" className="text-primary-600 hover:underline">隐私政策</Link>
+            </div>
             <div className="pt-2">已有账号？<Link href="/assessment" className="text-primary-600 hover:underline font-medium">先去评估 →</Link></div>
           </div>
         </form>

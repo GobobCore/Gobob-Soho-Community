@@ -37,6 +37,35 @@ jobs:
           print('✓ community 入口正确')
           "
 
+  # R-Feat 2026-10-01: 后端 pytest。
+  # 此前 CI 完全不跑测试, 导致本机积累的 9 个 collection error / 版本漂移无人发现。
+  # 关键: 必须按 requirements.txt 装依赖 —— 直接 pip install 会拉到
+  # fastapi 0.109 + starlette 0.36 + httpx 0.28 的错位组合, TestClient 全部报错。
+  backend-test:
+    name: Backend pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Install deps
+        run: |
+          pip install -r shared/backend-core/requirements.txt
+          pip install pytest
+      - name: Verify pinned versions
+        run: |
+          python -c "
+          import fastapi, starlette, httpx
+          print(f'fastapi={fastapi.__version__} starlette={starlette.__version__} httpx={httpx.__version__}')
+          # httpx>=0.28 移除了 Client(app=...), 与 starlette TestClient 不兼容
+          major, minor = (int(x) for x in httpx.__version__.split('.')[:2])
+          assert (major, minor) < (0, 28), f'httpx {httpx.__version__} 过新, 会破坏 TestClient'
+          "
+      - name: Run pytest
+        run: |
+          # 不加 -x: 一次跑完看清全部失败, 而不是只报第一个
+          python -m pytest shared/backend-core/tests/ -q --no-header
+
   portal-build:
     name: Portal (Next.js) build + vitest
     runs-on: ubuntu-latest
@@ -49,7 +78,7 @@ jobs:
           cd community/portal
           npm install --no-audit --no-fund
           npm run build
-      - name: Vitest (R-Feat 2026-09-16: 关键组件测试)
+      - name: "Vitest (R-Feat 2026-09-16: 关键组件测试)"
         run: |
           cd community/portal
           npm run test

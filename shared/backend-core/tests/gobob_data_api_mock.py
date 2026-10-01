@@ -100,7 +100,10 @@ def _make_match_response(req: dict) -> dict:
     """根据评估输入生成 3-6 个 mock 匹配结果."""
     target = req.get("target_countries", ["US"])
     target = target[0] if target else "US"
-    gpa = float(req.get("gpa", 3.5))
+    # gobob phase3.MatchRequest 真实字段名是 current_gpa (不是 gpa)。
+    # R-Fix 2026-10-01: 后端 _map_to_gobob_match 已对齐真实 schema,
+    # 这里同时接受 current_gpa (新) 与 gpa (旧) 兜底, 避免 mock 静默取默认值。
+    gpa = float(req.get("current_gpa") or req.get("gpa") or 3.5)
     toefl = int(req.get("toefl", 100))
 
     # 按 gpa + 国家简单匹配

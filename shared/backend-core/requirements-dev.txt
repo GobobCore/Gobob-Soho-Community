@@ -1,0 +1,21 @@
+# 开发/测试依赖 (不进入生产镜像)
+# ==============================================================================
+# 用途: 本地开发与 CI 的测试工具链。生产部署只需 requirements.lock。
+#
+# 锁定方式 (改完 requirements.txt 或本文件后重新生成):
+#   pip-compile --output-file=shared/backend-core/requirements.lock \
+#               shared/backend-core/requirements.txt
+#   pip-compile --output-file=shared/backend-core/requirements-dev.lock \
+#               shared/backend-core/requirements-dev.txt
+#
+# R-Fix 2026-10-01: 此前 pytest / pip-tools / playwright 只存在于开发者本机,
+# 未在任何文件中声明 —— 版本随各人环境漂移, 且 CI 只能临时 pip install。
+# ==============================================================================
+-r requirements.txt
+
+pytest==9.1.1
+pip-tools==7.6.1
+
+# E2E (test_playwright_e2e.py)。浏览器二进制需额外执行:
+#   .venv/bin/playwright install chromium
+playwright==1.63.0

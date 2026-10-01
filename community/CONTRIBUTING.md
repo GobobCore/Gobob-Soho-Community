@@ -131,7 +131,7 @@ curl http://localhost:19011/api/health
 # 创建 venv
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r shared/backend-core/requirements.txt
+pip install -r shared/backend-core/requirements.lock
 
 # 启动 MySQL (用 docker 或本机)
 docker run -d --name soho-mysql-test -e MYSQL_ROOT_PASSWORD=test \

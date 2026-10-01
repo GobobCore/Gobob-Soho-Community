@@ -21,7 +21,7 @@ cd Gobob-Soho-Community
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r shared/backend-core/requirements.txt
+pip install -r shared/backend-core/requirements.lock
 ```
 
 ## 3. 建库 (MySQL)
@@ -66,10 +66,31 @@ uvicorn community.backend.main:app --host 0.0.0.0 --port 19011 --reload
 
 ```bash
 cd community/portal
-npm install
-npm run dev          # 开发; 生产用 npm run build && npm start
+npm ci                  # 用 lock 文件, 勿用 npm install (会漂移到未锁定的依赖)
+npm run dev             # 开发用 (热更新, 不用 build)
 # 访问 http://localhost:19012
 ```
+
+### ⚠️ 重建前必须先停 next start
+
+生产模式下 `npm run build` 会**整体覆盖** `.next/`。若此时 `npm start`
+(`next start`) 仍在运行, 会造成产物与进程不一致:
+
+- HTML 引用的 chunk hash 已更新, 进程却仍持有旧 build manifest
+- 浏览器加载到不匹配的 JS, **React hydration 失败**
+- 症状: 页面对但交互退化 —— 表单从 React onSubmit 变成浏览器原生提交、
+  提交后不跳转而是刷新当前 URL
+
+这个故障极具迷惑性: E2E 测试表现为「时好时坏的 flaky」, 实际是确定性的环境错误。
+
+```bash
+# 正确顺序
+pkill -f "next start -p 19012"    # 1. 先停
+npm run build                      # 2. 再 build
+npm start                          # 3. 最后起
+```
+
+`npm run dev` 没有这个问题 (不产出 `.next/`), 开发时优先用它。
 
 ## 7. 起 app (服务平台, 19013)
 

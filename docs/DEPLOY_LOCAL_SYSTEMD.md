@@ -102,7 +102,7 @@ WantedBy=default.target
 # 1. venv (repo 根)
 python3 -m venv /tmp/soho-venv
 source /tmp/soho-venv/bin/activate
-pip install -r ~/.openclaw/workspace/gobob-soho/shared/backend-core/requirements.txt
+pip install -r ~/.openclaw/workspace/gobob-soho/shared/backend-core/requirements.lock
 
 # 2. MySQL 库 + 用户 (用本机 root 跑一次)
 mysql -uroot -p <<'SQL'

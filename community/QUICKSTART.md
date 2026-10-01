@@ -12,7 +12,11 @@ cd Gobob-Soho-Community
 # Python 3.11+ (后端)
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r shared/backend-core/requirements.txt
+# 用 lock 文件: requirements.txt 是宽松范围, 直接装会随时间漂移到
+# 不兼容的版本组合 (本项目曾因此出现 TestClient 全部报错的情况)。
+pip install -r shared/backend-core/requirements.lock
+# 若还要跑后端测试, 改用 dev lock (含 pytest / playwright):
+#   pip install -r shared/backend-core/requirements-dev.lock
 ```
 
 ## 2. MySQL (2 分钟)

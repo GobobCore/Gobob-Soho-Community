@@ -69,11 +69,14 @@ def _bootstrap():
 def create_app() -> FastAPI:
     """FastAPI 工厂 — 返回业务核心 app (不含 SaaS 扩展).
 
-    cloud/backend-saas/main.py 用法:
-        from shared.backend_core.main import create_app
-        app = create_app()
-        app.include_router(saas_admin_router)  # SaaS 扩展
-        return app
+    saas/backend/main.py 的用法:
+        app = create_app()          # 社区版到这就结束
+        app.include_router(saas_admin_router)   # SaaS 版再挂扩展
+
+    本函数只挂 shared 层的路由。SaaS 专属表 (saas_api_usage /
+    saas_key_orders / saas_invoices) 由 saas/backend/api/saas_admin.py 在
+    运行时 DDL 创建, 不在本层的 schema.sql 中 —— 社区部署里不存在,
+    shared 层若直接查询必然 500。详见 test_shared_layer_boundaries.py。
     """
     app = FastAPI(title="Gobob SOHO API", version="0.2.0", redirect_slashes=True)
 

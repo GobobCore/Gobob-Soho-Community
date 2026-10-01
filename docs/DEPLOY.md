@@ -70,7 +70,7 @@ backend 启动时自动创建初始机构和管理员(取 `.env` 的 `SOHO_ADMIN
 ```bash
 # 后端 (community/backend/main.py 入口)
 python3 -m venv .venv && source .venv/bin/activate
-pip install -r shared/backend-core/requirements.txt
+pip install -r shared/backend-core/requirements.lock   # 锁定版本, 勿用 requirements.txt
 SOHO_MYSQL_HOST=127.0.0.1 SOHO_MYSQL_PASS=... \
   uvicorn community.backend.main:app --port 19011 --reload
 

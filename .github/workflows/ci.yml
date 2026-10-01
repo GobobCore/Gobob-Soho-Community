@@ -21,7 +21,10 @@ jobs:
       - name: Install deps
         run: |
           cd shared/backend-core
-          pip install -r requirements.txt
+          # 用 lock 而非 requirements.txt: 后者是宽松范围, 装出的组合随时间漂移。
+          # 本仓曾因此出现 fastapi 0.109 + starlette 0.36 + httpx 0.28 的错位组合,
+          # TestClient 全部报 Client(app=...) TypeError, 却无人察觉。
+          pip install -r requirements.lock
       - name: Import check (community 入口)
         run: |
           python -c "
@@ -50,8 +53,10 @@ jobs:
         with: { python-version: "3.12" }
       - name: Install deps
         run: |
-          pip install -r shared/backend-core/requirements.txt
-          pip install pytest
+          # 用 dev lock (含 pytest/playwright), 保证 CI 与本地 .venv 完全一致。
+          # 更新: pip-compile --output-file=shared/backend-core/requirements-dev.lock \
+          #              shared/backend-core/requirements-dev.txt
+          pip install -r shared/backend-core/requirements-dev.lock
       - name: Verify dependency compatibility
         run: |
           python -c "

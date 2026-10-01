@@ -246,7 +246,7 @@ export default function BuyKeyPage() {
                 <li>你打开支付宝网页完成支付 (app_id 2021006184625001)</li>
                 <li>支付成功, 我们后台自动对账</li>
                 <li>API Key 会通过 <strong>{form.contact_email}</strong> 发送给你</li>
-                <li>支付问题联系我们: <Link href="/contact" className="underline">contact@gobob.cn</Link></li>
+                <li>支付问题联系我们: <a href="mailto:contact@gobob.cn" className="underline">contact@gobob.cn</a></li>
               </ol>
             </div>
 

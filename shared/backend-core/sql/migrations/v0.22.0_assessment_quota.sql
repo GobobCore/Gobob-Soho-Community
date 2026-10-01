@@ -6,13 +6,13 @@
 CREATE TABLE IF NOT EXISTS assessment_quota_usage (
   id            BIGINT AUTO_INCREMENT PRIMARY KEY,
   org_id        CHAR(16) NOT NULL,
-  year_month    CHAR(7)  NOT NULL COMMENT 'YYYY-MM, 月度计数窗口',
+  `year_month`  CHAR(7)  NOT NULL COMMENT 'YYYY-MM, 月度计数窗口',
   used_count    INT      NOT NULL DEFAULT 0 COMMENT '本月已用次数',
   year_used     INT      NOT NULL DEFAULT 0 COMMENT '本年已用次数 (跨月累计行冗余)',
   extra_paid    INT      NOT NULL DEFAULT 0 COMMENT '付费购买的增加量 (年包)',
   created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY uk_org_month (org_id, year_month)
+  UNIQUE KEY uk_org_month (org_id, `year_month`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='智能评估月度/年度用量';
 
 CREATE TABLE IF NOT EXISTS quota_orders (

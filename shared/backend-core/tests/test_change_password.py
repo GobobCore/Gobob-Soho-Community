@@ -188,6 +188,10 @@ class TestUpdateProfile:
     def test_patch_none_fields_no_change(self, client, token):
         """PATCH 不带字段 → 不改. updated 计数 = 0."""
         try:
+            # 保存原始 name
+            r0 = client.get("/api/me", headers=_auth(token))
+            orig_name = r0.json()["name"]
+
             # PATCH 不带 phone 字段 (PATCH 语义), updated=0
             r = client.patch(
                 "/api/profile",
@@ -205,6 +209,14 @@ class TestUpdateProfile:
             )
             assert r2.status_code == 200
             assert r2.json()["updated"] == 1
+
+            # 还原原始 name
+            r3 = client.patch(
+                "/api/profile",
+                headers=_auth(token),
+                json={"name": orig_name},
+            )
+            assert r3.status_code == 200
         except Exception:
             raise
 

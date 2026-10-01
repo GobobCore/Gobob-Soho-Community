@@ -1,0 +1,67 @@
+#!/bin/bash
+# pre-commit — 本地快速门禁
+# ============================================================================
+# 只放**快**的检查。全量 pytest 约 34s, 放在 commit 里没人愿意等, CI 已经
+# 覆盖全量。这里只拦两类"必须在提交那一刻就发现"的问题:
+#
+#   1. 共享层架构边界 (约 1.4s) —— 防止社区版引用 SaaS 专属表
+#   2. 暂存区高置信凭据 (约 0.1s) —— 防止再次把密钥推上去
+#
+# 紧急情况可 git commit --no-verify 绕过, 但请说明理由。
+# ============================================================================
+set -uo pipefail
+
+# 必须用 git 问仓库根, 不能用 dirname/.. ——
+# 本文件源码位于 scripts/git-hooks/, 安装后位于 .git/hooks/,
+# 两种位置下 dirname/.. 分别指向仓库根和 .git/, 只有 git 自己知道答案。
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "$REPO_ROOT" || ! -d "$REPO_ROOT" ]]; then
+  echo "⚠️  不在 git 仓库中, 跳过本地门禁"
+  exit 0
+fi
+cd "$REPO_ROOT"
+
+# 无变更时直接退出
+if [[ -z "$(git diff --cached --name-only)" ]]; then
+  exit 0
+fi
+
+# 用项目 .venv, 退回系统 python
+PY="$REPO_ROOT/.venv/bin/python"
+if [[ ! -x "$PY" ]]; then
+  if command -v python3 > /dev/null 2>&1; then
+    PY="python3"
+  else
+    echo "⚠️  找不到 python, 跳过本地门禁 (CI 仍会兜底)"
+    exit 0
+  fi
+fi
+
+FAILED=0
+
+# ── 1. 敏感凭据 ────────────────────────────────────────────────────────
+echo "[pre-commit] 扫描暂存区凭据..."
+if ! "$PY" scripts/scan_staged_secrets.py --quiet; then
+  FAILED=1
+fi
+
+# ── 2. 共享层架构边界 ──────────────────────────────────────────────────
+# 仅当改动触及 shared/ 时才跑, 改前端/文档时无需付出这 1.4s
+if git diff --cached --name-only | grep -q '^shared/backend-core/'; then
+  echo "[pre-commit] 检查 shared 层架构边界..."
+  if ! "$PY" -m pytest shared/backend-core/tests/test_shared_layer_boundaries.py \
+        -q --no-header -p no:cacheprovider 2>&1 | tail -3; then
+    echo "❌ shared 层边界检查失败"
+    FAILED=1
+  fi
+fi
+
+if [[ "$FAILED" -ne 0 ]]; then
+  echo ""
+  echo "❌ 本地门禁未通过, 提交已阻止。"
+  echo "   确认可忽略时: git commit --no-verify"
+  exit 1
+fi
+
+echo "[pre-commit] 通过"
+exit 0

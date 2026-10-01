@@ -116,11 +116,17 @@ jobs:
           docker run -d --name soho-mysql \
             -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=gobob_soho_test \
             mysql:8 > /dev/null
+          # 必须等"能真正执行查询", 不能只等 mysqladmin ping ——
+          # MySQL 8 容器在初始化早期 ping 就已返回成功, 但此时 root 密码尚未
+          # 设置完成, 后续 mysql -uroot -ptest 会报
+          # "Lost connection to MySQL server at 'reading initial communication packet'"。
           for i in $(seq 1 60); do
-            docker exec soho-mysql mysqladmin ping -uroot -ptest > /dev/null 2>&1 && { echo "✓ MySQL 就绪 (${i}s)"; exit 0; }
-            sleep 1
+            if docker exec soho-mysql mysql -uroot -ptest gobob_soho_test -e "SELECT 1" > /dev/null 2>&1; then
+              echo "✓ MySQL 就绪 (${i}s)"; exit 0
+            fi
+            sleep 2
           done
-          echo "✗ MySQL 60s 内未就绪"; docker logs soho-mysql | tail -20; exit 1
+          echo "✗ MySQL 120s 内未就绪"; docker logs soho-mysql | tail -30; exit 1
       - name: Run schema.sql + seed.sql
         run: |
           docker exec -i soho-mysql mysql -uroot -ptest gobob_soho_test < shared/backend-core/sql/schema.sql

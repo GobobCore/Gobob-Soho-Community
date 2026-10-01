@@ -82,11 +82,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        # R-Fix 2026-10-01: 20 → 22。portal 的 vitest.setup.ts 里有条件式
+        # fetch/TextEncoder polyfill (仅在缺失时注入), 对 Node 运行时版本敏感;
+        # 22 是本地实测 6/6 通过的版本。package.json 暂无 engines 声明,
+        # 后续建议补上 "engines": { "node": ">=22" } 与此保持一致。
+        with: { node-version: "22" }
       - name: Build
         run: |
           cd community/portal
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
           npm run build
       - name: "Vitest (R-Feat 2026-09-16: 关键组件测试)"
         run: |

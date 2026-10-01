@@ -76,3 +76,48 @@
 ## 新端点（88 → 93 个 API）
 
 + collisions / merge / claim / loss-reasons / source-roi / renew / items/{id}/status / items/{id}/refund / tasks/{id}/dependencies / timeline / deliverables/{did}/versions / deliverables/versions/{vid}/review / deliverables/{did} (全版本) / relationships CRUD
+
+---
+
+# 2026-10-01 — 安全加固 + 测试基建 + CI 首次真正运行
+
+> 起因: 盘点代码时发现公开仓闭源泄漏已持续两周未处理, 且 CI 长期为红。
+
+## 安全
+
+**公开仓闭源泄漏修复**（`Gobob-Soho-Community`，`private: false`）
+- 事故成因: 2026-09-17 的 `--force` push 将含 `saas/` 的完整 monorepo 推入公开仓；
+  `release_community.sh` 原本的设计是「先推后删」，等于每次发布主动开泄漏窗口，
+  且补救从未成功执行。48 个 SaaS 闭源文件在公开仓挂了约两周。
+- 处置: `git filter-repo` 重写历史 91→51 提交，删去 `saas/`、内部战略文档、
+  `release.yml`、内部发布脚本与 `tmp_quota_view.js`。
+- 全 91 提交扫描（高置信模式 + 熵值）确认**无真实凭据泄露**，故无需密钥轮换。
+- 根因修复: 发布脚本改为**推送前**在临时副本剥离闭源路径，并设三道闸
+  （逐提交扫描禁止路径 / 内部敏感词 / `community/`+`shared/` 完整性）。
+- 社区文档去内部化：安装指令从私有仓改为公开仓，移除生产 API Key id。
+
+## 测试基建
+
+原 CI **不跑任何测试**，只做 import 检查、portal 构建、SQL 语法。本次:
+- 新增 `backend-test` job，跑全量 pytest（含行为级依赖兼容验证）
+- 修 `conftest.py` 路径 bug（`_BACKEND_CORE` 变量名与实际取值不符，测试存在隐式顺序依赖）
+- 修 mock 字段名（`gpa` → `current_gpa`，与 gobob 真实 schema 对齐）
+- 修 `ci.yml` 既有 YAML 语法错误（`name` 值含未加引号冒号）——**该配置自加入起
+  GitHub Actions 就无法解析**，修好后 CI 首次真正运行，随即暴露后续两个问题
+- 结果: 9 个 collection error → **70 passed / 3 skipped**
+
+## 架构修复
+
+- `shared/orgs_me.py` 原硬查 3 张 SaaS 专属表，社区部署中这些表不存在 → **必然 500**。
+  改为表存在性探测，社区版返回 `billing_available=false` 并优雅降级。
+- `saas_key_orders` 原仅存 `org_name`，机构改名后历史订单全部孤儿化。
+  新增 `v0.23.0` migration 加 `org_id` 并回填（仅唯一匹配行）。
+- 修 `v0.22.0` 语法错误：`year_month` 是 MySQL 保留字，当列名未加反引号，
+  该 migration **从未跑通过**。
+
+## 功能
+
+- 评估链路对齐 gobob `phase3.MatchRequest` 真实 schema；新增评估历史/详情端点
+- portal 多机构 `?org=<slug>` 持久化 + 机构自助注册页
+- soho-app 新增 6 个视图（订单用量 / 用户 / 模板 / 智能选校 / 评估报告 / 个人资料）
+- 订阅自助化：席位升级、自助取消订单

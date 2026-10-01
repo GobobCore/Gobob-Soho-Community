@@ -52,14 +52,24 @@ jobs:
         run: |
           pip install -r shared/backend-core/requirements.txt
           pip install pytest
-      - name: Verify pinned versions
+      - name: Verify dependency compatibility
         run: |
           python -c "
           import fastapi, starlette, httpx
           print(f'fastapi={fastapi.__version__} starlette={starlette.__version__} httpx={httpx.__version__}')
-          # httpx>=0.28 移除了 Client(app=...), 与 starlette TestClient 不兼容
-          major, minor = (int(x) for x in httpx.__version__.split('.')[:2])
-          assert (major, minor) < (0, 28), f'httpx {httpx.__version__} 过新, 会破坏 TestClient'
+
+          # 真正的不兼容点是 starlette 太老: starlette<0.37 的 TestClient 仍用
+          # httpx.Client(app=...), 而 httpx>=0.28 已移除该参数。
+          # requirements 已把 starlette 锁在 >=0.40,<0.46, 这里做行为级验证 ——
+          # 比断言版本字符串更可靠: starlette 何时再次移除该参数都不必改这里。
+          from starlette.testclient import TestClient
+          from fastapi import FastAPI
+          app = FastAPI()
+          @app.get('/ping')
+          def ping(): return {'ok': True}
+          c = TestClient(app)
+          assert c.get('/ping').json() == {'ok': True}, 'TestClient 不可用'
+          print('✓ TestClient 与当前 httpx 兼容')
           "
       - name: Run pytest
         run: |
@@ -87,36 +97,43 @@ jobs:
           test -d community/portal/.next && echo "✓ portal build OK"
 
   # 业务核心 SQL migration 语法检查
+  #
+  # R-Fix 2026-10-01: 弃用 services.mysql + apt default-mysql-client。
+  # ubuntu-24.04 上 default-mysql-client 解析到 MariaDB client, 连 MySQL 8
+  # 存在兼容问题 (认证插件 / 保留字), 该 job 长期 failure。
+  # 改为自带 mysql:8 容器, 用镜像自带的同版本 client, 并显式等待就绪。
   sql-syntax:
     name: SQL syntax
     runs-on: ubuntu-latest
-    services:
-      mysql:
-        image: mysql:8
-        env:
-          MYSQL_ROOT_PASSWORD: test
-          MYSQL_DATABASE: gobob_soho_test
-        ports: [3306:3306]
-        options: --health-cmd="mysqladmin ping" --health-interval=5s --health-retries=5
     steps:
       - uses: actions/checkout@v4
-      - name: Run schema.sql
+      - name: Start MySQL 8
         run: |
-          apt-get install -y default-mysql-client > /dev/null
-          mysql -h 127.0.0.1 -uroot -ptest gobob_soho_test < shared/backend-core/sql/schema.sql
-          mysql -h 127.0.0.1 -uroot -ptest gobob_soho_test < shared/backend-core/sql/seed.sql
+          docker run -d --name soho-mysql \
+            -e MYSQL_ROOT_PASSWORD=test -e MYSQL_DATABASE=gobob_soho_test \
+            mysql:8 > /dev/null
+          for i in $(seq 1 60); do
+            docker exec soho-mysql mysqladmin ping -uroot -ptest > /dev/null 2>&1 && { echo "✓ MySQL 就绪 (${i}s)"; exit 0; }
+            sleep 1
+          done
+          echo "✗ MySQL 60s 内未就绪"; docker logs soho-mysql | tail -20; exit 1
+      - name: Run schema.sql + seed.sql
+        run: |
+          docker exec -i soho-mysql mysql -uroot -ptest gobob_soho_test < shared/backend-core/sql/schema.sql
+          docker exec -i soho-mysql mysql -uroot -ptest gobob_soho_test < shared/backend-core/sql/seed.sql
           echo "✓ schema.sql + seed.sql 跑通"
       - name: Run all migrations (idempotent)
         run: |
           for m in shared/backend-core/sql/migrations/*.sql; do
-            echo "  apply $m"
-            mysql -h 127.0.0.1 -uroot -ptest gobob_soho_test < "$m" || { echo "✗ migration failed: $m"; exit 1; }
+            echo "  apply $(basename "$m")"
+            docker exec -i soho-mysql mysql -uroot -ptest gobob_soho_test < "$m" \
+              || { echo "✗ migration failed: $m"; exit 1; }
           done
           echo "✓ 所有 migration 幂等可跑"
       - name: Verify key tables exist
         run: |
-          mysql -h 127.0.0.1 -uroot -ptest gobob_soho_test -e "
+          docker exec -i soho-mysql mysql -uroot -ptest gobob_soho_test -e "
           SELECT COUNT(*) AS tables FROM information_schema.tables WHERE table_schema='gobob_soho_test';
           SELECT COUNT(*) AS scopes FROM api_key_scopes;
-          SELECT COUNT(*) AS plans FROM orgs;  -- 至少有 admin/owner default
+          SELECT COUNT(*) AS orgs FROM orgs;
           "

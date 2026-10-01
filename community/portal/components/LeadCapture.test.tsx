@@ -7,6 +7,26 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import LeadCapture from './LeadCapture';
 
+/**
+ * 类型安全的 fetch mock。
+ *
+ * 组件只读 response.ok / .status / .json(), 但 vi.fn() 推导出的对象不满足
+ * Response 的完整结构 (缺 headers / redirected / text 等), 直接赋给
+ * globalThis.fetch 会触发 TS2322。这里把断言收口到一处, 各用例只描述
+ * 自己关心的字段。
+ */
+function mockFetch(opts: { body?: unknown; ok?: boolean; status?: number } = {}) {
+  const { body = {}, ok = true, status = 200 } = opts;
+  // 显式声明参数签名 —— 否则 vi.fn 的实现无参, mock.calls 被推导为 [][],
+  // 调用断言里取 call[0] 会报 "Tuple type '[]' has no element at index '0'"。
+  const fn = vi.fn(
+    (_input?: unknown, _init?: { method?: string; body?: string }) =>
+      Promise.resolve({ ok, status, json: () => Promise.resolve(body) })
+  );
+  globalThis.fetch = fn as unknown as typeof fetch;
+  return fn;
+}
+
 describe('LeadCapture', () => {
   const mockOnDone = vi.fn();
   const mockOnClose = vi.fn();
@@ -14,7 +34,7 @@ describe('LeadCapture', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // mock fetch (jsdom 没有, 但我们 setup 装了 undici)
-    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
+    mockFetch();
   });
 
   it('should render name and contact inputs', () => {
@@ -32,9 +52,7 @@ describe('LeadCapture', () => {
 
   it('should show error when submitting empty form', async () => {
     // mock fetch 让 submit 不会发真请求
-    globalThis.fetch = vi.fn(() =>
-      Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
-    );
+    mockFetch();
     render(
       <LeadCapture onClose={mockOnClose} onDone={mockOnDone} />
     );
@@ -46,9 +64,7 @@ describe('LeadCapture', () => {
   });
 
   it('should call onDone after successful submit', async () => {
-    globalThis.fetch = vi.fn(() =>
-      Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) })
-    );
+    mockFetch({ body: { ok: true } });
     render(
       <LeadCapture assessmentId="a1" onClose={mockOnClose} onDone={mockOnDone} />
     );
@@ -72,10 +88,7 @@ describe('LeadCapture', () => {
   });
 
   it('should send POST to /api/leads/capture with correct body', async () => {
-    const mockFetch = vi.fn(() =>
-      Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true }) })
-    );
-    globalThis.fetch = mockFetch;
+    const mockFetchSpy = mockFetch({ body: { ok: true } });
 
     render(
       <LeadCapture
@@ -96,14 +109,14 @@ describe('LeadCapture', () => {
       fireEvent.click(submitBtn);
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalled();
+        expect(mockFetchSpy).toHaveBeenCalled();
       });
 
       // 验证 fetch 调用参数
-      const call = mockFetch.mock.calls[0];
-      expect(call[0]).toBe('/api/leads/capture');
-      expect(call[1].method).toBe('POST');
-      const body = JSON.parse(call[1].body);
+      const call = mockFetchSpy.mock.calls[0];
+      expect(call?.[0]).toBe('/api/leads/capture');
+      expect(call?.[1]?.method).toBe('POST');
+      const body = JSON.parse(call?.[1]?.body ?? '{}');
       expect(body.student_name).toBe('张三');
       expect(body.student_phone).toBe('13900000000');
       expect(body.assessment_id).toBe('ass_test_001');
@@ -115,8 +128,7 @@ describe('LeadCapture', () => {
     // mock useSearchParams (Next.js hook) — jsdom 默认没有, 我们直接 mock
     // 这个测试可选 — 实际行为需要 router context, 跳过复杂 mock
     // 仅做 smoke test 验证组件不崩
-    const mockFetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
-    globalThis.fetch = mockFetch;
+    mockFetch();
 
     render(
       <LeadCapture onClose={mockOnClose} onDone={mockOnDone} />
@@ -125,9 +137,7 @@ describe('LeadCapture', () => {
   });
 
   it('should show error message on fetch failure', async () => {
-    globalThis.fetch = vi.fn(() =>
-      Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({ detail: '服务器错误' }) })
-    );
+    mockFetch({ ok: false, status: 500, body: { detail: '服务器错误' } });
 
     render(
       <LeadCapture assessmentId="a2" onClose={mockOnClose} onDone={mockOnDone} />
